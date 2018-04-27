@@ -86,20 +86,25 @@ class MLH(Farmware):
         prefix = APP_NAME.lower().replace('-', '_')
         self.params = {}
 
-        filter = os.environ.get(prefix + "_filter_meta", "[('plant_stage','planned')]")
-        save = os.environ.get(prefix + "_save_meta", "[('plant_stage','planned'),('del','*')]")
+        filter = os.environ.get(prefix + "_filter_meta", "[('plant_stage','planted')]")
+        save = os.environ.get(prefix + "_save_meta", "None")
 
         try:
             self.params['filter_meta'] = ast.literal_eval(filter)
             self.params['save_meta'] = ast.literal_eval(save)  # \"date\",\"today\"
+
+            if not isinstance(self.params['filter_meta'], list) and self.params['filter_meta']!=None:
+                raise ValueError
+            if not isinstance(self.params['save_meta'], list) and self.params['save_meta']!=None:
+                raise ValueError
         except:
             raise ValueError("Invalid meta {} or {}".format(filter, save))
 
-        self.params['pointname'] = os.environ.get(prefix + "_pointname", 'Carrot')
-        self.params['sequence'] = {'init': {'name': os.environ.get(prefix + '_init', 'None'), 'id': -1},
-                                   'before': {'name': os.environ.get(prefix + '_before', 'None'), 'id': -1},
-                                   'after': {'name': os.environ.get(prefix + '_after', 'None'), 'id': -1},
-                                   'end': {'name': os.environ.get(prefix + '_end', 'None'), 'id': -1}}
+        self.params['pointname'] = os.environ.get(prefix + "_pointname", 'Beets')
+        self.params['sequence'] = {'init': {'name': os.environ.get(prefix + '_init', 'Pickup seeder'), 'id': -1},
+                                   'before': {'name': os.environ.get(prefix + '_before', 'Grab a seed'), 'id': -1},
+                                   'after': {'name': os.environ.get(prefix + '_after', 'Plant a seed'), 'id': -1},
+                                   'end': {'name': os.environ.get(prefix + '_end', 'Return seeder'), 'id': -1}}
 
         self.params['default_z'] = int(os.environ.get(prefix + "_default_z", -300))
         self.params['action'] = os.environ.get(prefix + "_action", 'test')
