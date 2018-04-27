@@ -1,0 +1,25 @@
+{
+ "package": "MLH",
+ "language": "python",
+ "author": "etcipnja",
+ "description": "Mother's little helper to automate routine operations on multiple plants at once",
+ "version": "1.1.3",
+ "min_os_version_major": 6,
+ "url": "https://raw.githubusercontent.com/etcipnja/Loop-Plants-With-Filters/master/manifest.json",
+ "zip": "https://github.com/etcipnja/Loop-Plants-With-Filters/archive/master.zip",
+ "executable": "python",
+ "args": ["MLH-master/MLH/script.py"],
+ "config": [
+  {"name": "pointname", "label": "Filter by plant name", "value": "*"},
+  {"name": "filter_meta", "label": "Filter by meta data ({\"key\":\"value\"}", "value": "-"},
+
+  {"name": "init", "label": "Init Sequence Name (one time)", "value": "-"},
+  {"name": "before", "label": "Sequence name Before Next Move  (each plant)", "value": "-"},
+  {"name": "after", "label": "Sequence Name After Move  (each plant)", "value": "-"},
+  {"name": "end", "label": "End Sequence Name (one time)", "value": "-"},
+
+  {"name": "save_meta", "label": "Save in meta data ({\"key\":\"value\"}", "value": "-"},
+  {"name": "default_z", "label": "default Z axis value when moving", "value": -300},
+  {"name": "action", "label": "What to do (test, real)", "value": "test"}
+  ]
+}
