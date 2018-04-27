@@ -84,6 +84,8 @@ class MLH(Farmware):
     def __init__(self):
         Farmware.__init__(self)
 
+    # ------------------------------------------------------------------------------------------------------------------
+    def load_config(self):
         prefix = APP_NAME.lower().replace('-', '_')
         self.params = {}
 
@@ -202,7 +204,7 @@ class MLH(Farmware):
 
         # filter points
         mypoints = [p for p in points if self.is_eligible(p)]
-        print("BEFORE")
+        self.log("BEFORE")
         for m in mypoints: self.log_point(m)
 
         # sort points for optimal movement
@@ -221,7 +223,7 @@ class MLH(Farmware):
 
         # execute end sequence
         self.execute_sequence(self.params['sequence']['end'], debug)
-        print("AFTER")
+        self.log("AFTER")
         for m in mypoints: self.log_point(m)
 
 
@@ -230,6 +232,7 @@ if __name__ == "__main__":
 
     try:
         app = MLH()
+        app.load_config()
         app.run()
 
     except Exception as e:
