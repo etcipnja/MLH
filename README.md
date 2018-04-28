@@ -1,7 +1,7 @@
 Problem:
 
 When you have to deal with a lot of plants you might be puzzled that you have to create a dedicated sequence for each
-instance of a plant. For exmaple: if you have 10 carrots - you proably need to create a watering sequence for every carrot
+instance of a plant. For exmaple: if you have 10 carrots - you probably need to create a watering sequence for every carrot
 individually. (Disclaimer: I seriously hope that I am missing something and there is a standard solution for this
 problem. But so far I don't know about any - so I wrote this farmware to help myself)
 
