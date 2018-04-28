@@ -44,12 +44,12 @@ Reference:
 
 Meta data fields require specially formatted input. In Python it is called "list of tupple pairs". Here is the example:
 [ ( ‘key1’, ‘value1’ ) , ( ‘key2’, ‘value2’ ) ]
-You can use whatever you want as a ‘key' and ‘value’ as long as they are strings in '’
+You can use whatever you want as a ‘key' and ‘value’ as long as they are strings.
 More than one element in the list allows you to filter by multiple criteria and update multiple meta data tags at once!
 Put "None" if you want to skip metadata feature.
 
 There are special words with special meaning:
-- key ‘plant_stage’ will not deal with metadata, instead it works with the attribute “Status” visible on the WebInterface
+- key ‘plant_stage’ will not deal with metadata, instead it works with the attribute “Status” visible
 in Farm Designer for every plant. Only valid values that go with this key are ‘planed’, ‘planted’ and ‘harvested’
 - key ‘del’ in SAVE filed causes to delete currently saved meta data for this plant. If ‘value' is ‘*’ - all metadata is
 deleted, otherwise only one key specified in ‘value’ is deleted
@@ -57,44 +57,45 @@ deleted, otherwise only one key specified in ‘value’ is deleted
 
 Examples:
 
-Seed all "planned" Carrots and mark then "planted"
-- FILTER BY PLANT NAME:             "Carrot"
-- FILTER BY META DATA:              "[('plant_stage':'planned')]"
-- INIT SEQUENCE NAME:               "Pickup seeder"  (or whatever the name you have)
-- SEQUENCE NAME BEFORE NEXT MOVE:   "Pickup a seed"
-- SEQUENCE NAME AFTER MOVE:         "Plant a seed"
-- END SEQUENCE NAME:                "Return seeder"
-- SAVE IN META DATA:                "[('plant_stage':'planted')]"
+Seed all "planned" Carrots and mark them "planted"
+- FILTER BY PLANT NAME:             Carrot
+- FILTER BY META DATA:              [('plant_stage':'planned')]
+- INIT SEQUENCE NAME:               Pickup seeder  (or whatever the name you have)
+- SEQUENCE NAME BEFORE NEXT MOVE:   Pickup a seed
+- SEQUENCE NAME AFTER MOVE:         Plant a seed
+- END SEQUENCE NAME:                Return seeder
+- SAVE IN META DATA:                [('plant_stage':'planted')]
+
 Please note that if you interrupt this sequence and restart it - it won't start seeding again from the beginning becasue
 already seeded plants are marked as "planted" and won't be selected again.
 
 
 Water all "planted" Carrots that have not been watered today
-- FILTER BY PLANT NAME:             "Carrot"
-- FILTER BY META DATA:              "[('plant_stage':'planned'), ('last_watering':'!today')]"
-- INIT SEQUENCE NAME:               "Pickup watering nozzle"
-- SEQUENCE NAME BEFORE NEXT MOVE:   "None"
-- SEQUENCE NAME AFTER MOVE:         "Water light"
-- END SEQUENCE NAME:                "Return watering nozzle"
-- SAVE IN META DATA:                "[('last_watering':'today')]"
+- FILTER BY PLANT NAME:             Carrot
+- FILTER BY META DATA:              [('plant_stage':'planted'), ('last_watering':'!today')]
+- INIT SEQUENCE NAME:               Pickup watering nozzle
+- SEQUENCE NAME BEFORE NEXT MOVE:   None
+- SEQUENCE NAME AFTER MOVE:         Water light
+- END SEQUENCE NAME:                Return watering nozzle
+- SAVE IN META DATA:                [('last_watering':'today')]
 
 Delete all meta data from all plants (does not affect plant_stage)
-- FILTER BY PLANT NAME:             "*"
-- FILTER BY META DATA:              "None"
-- INIT SEQUENCE NAME:               "None"
-- SEQUENCE NAME BEFORE NEXT MOVE:   "None"
-- SEQUENCE NAME AFTER MOVE:         "None"
-- END SEQUENCE NAME:                "None"
-- SAVE IN META DATA:                "[('del':'*')]"
+- FILTER BY PLANT NAME:             *
+- FILTER BY META DATA:              None
+- INIT SEQUENCE NAME:               None
+- SEQUENCE NAME BEFORE NEXT MOVE:   None
+- SEQUENCE NAME AFTER MOVE:         None
+- END SEQUENCE NAME:                None
+- SAVE IN META DATA:                [('del':'*')]
 
 Delete watering tag from all plants that were watered today
-- FILTER BY PLANT NAME:             "*"
-- FILTER BY META DATA:              "[('last_watering':'today')]"
-- INIT SEQUENCE NAME:               "None"
-- SEQUENCE NAME BEFORE NEXT MOVE:   "None"
-- SEQUENCE NAME AFTER MOVE:         "None"
-- END SEQUENCE NAME:                "None"
-- SAVE IN META DATA:                "[('del':'last_watering')]"
+- FILTER BY PLANT NAME:             *
+- FILTER BY META DATA:              [('last_watering':'today')]
+- INIT SEQUENCE NAME:               None
+- SEQUENCE NAME BEFORE NEXT MOVE:   None
+- SEQUENCE NAME AFTER MOVE:         None
+- END SEQUENCE NAME:                None
+- SAVE IN META DATA:                [('del':'last_watering')]
 
 
 Installation:
@@ -112,7 +113,7 @@ is displayed in the form.
 Credits:
 
 The original idea belongs to @renaud with his Loop-Plants-With-Filters. https://github.com/rdegosse/Loop-Plants-With-Filters/blob/master/README.md
-MLH - is a simplified version of it with nice perks about saving/filtering meta data
+This Farmware - is a simplified version of it with nice perks about saving/filtering meta data
 
 Thank you,
 Eugene
