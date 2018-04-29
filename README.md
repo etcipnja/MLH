@@ -50,7 +50,7 @@ Put "None" if you want to skip metadata feature.
 
 There are special words with special meaning:
 - key ‘plant_stage’ will not deal with metadata, instead it works with the attribute “Status” visible
-in Farm Designer for every plant. Only valid values that go with this key are ‘planed’, ‘planted’ and ‘harvested’
+in Farm Designer for every plant. Only valid values that go with this key are ‘planned’, ‘planted’ and ‘harvested’
 - key ‘del’ in SAVE filed causes to delete currently saved meta data for this plant. If ‘value' is ‘*’ - all metadata is
 deleted, otherwise only one key specified in ‘value’ is deleted
 - value ‘today’ is replaced with actual today’s date. In FILTER you can write ‘!today’ which means “not today’.

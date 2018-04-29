@@ -51,10 +51,10 @@ class Farmware():
         return response.json()
 
     # ------------------------------------------------------------------------------------------------------------------
-    def execute_sequence(self, sequence, debug=False):
+    def execute_sequence(self, sequence, debug=False, message=''):
         if sequence['id'] != -1:
-            self.log(
-                '{}Executing sequence: {}({})'.format("" if not debug else "DEBUG ", sequence['name'], sequence['id']))
+            if message != None:
+                self.log('{}Executing sequence: {}({})'.format(message, sequence['name'], sequence['id']))
             if not debug:
                 node = {'kind': 'execute', 'args': {'sequence_id': sequence['id']}}
                 response = requests.post(os.environ['FARMWARE_URL'] + 'api/v1/celery_script', data=json.dumps(node),
@@ -62,8 +62,10 @@ class Farmware():
                 self.handle_error(response)
 
     # ------------------------------------------------------------------------------------------------------------------
-    def move_absolute(self, location, offset, debug=False):
-        self.log('{}Moving absolute: {} {}'.format("" if not debug else "DEBUG ", str(location), str(offset)))
+    def move_absolute(self, location, offset, debug=False, message=''):
+
+        if message!=None:
+            self.log('{}Moving absolute: {} {}'.format(message, str(location), "" if offset=={'y': 0, 'x': 0, 'z': 0} else str(offset)))
 
         node = {'kind': 'move_absolute', 'args':
             {
@@ -89,15 +91,15 @@ class MLH(Farmware):
         prefix = APP_NAME.lower().replace('-', '_')
         self.params = {}
 
-        self.params['pointname'] = os.environ.get(prefix + "_pointname", '*')
-        self.params['sequence'] = {'init': {'name': os.environ.get(prefix + '_init', 'None'), 'id': -1},
-                                   'before': {'name': os.environ.get(prefix + '_before', 'None'), 'id': -1},
-                                   'after': {'name': os.environ.get(prefix + '_after', 'None'), 'id': -1},
-                                   'end': {'name': os.environ.get(prefix + '_end', 'None'), 'id': -1}}
+        self.params['pointname'] = os.environ.get(prefix + "_pointname", 'Cabbage')
+        self.params['sequence'] = {'init': {'name': os.environ.get(prefix + '_init', 'Pickup seeder'), 'id': -1},
+                                   'before': {'name': os.environ.get(prefix + '_before', 'Grab a seed'), 'id': -1},
+                                   'after': {'name': os.environ.get(prefix + '_after', 'Plant a seed'), 'id': -1},
+                                   'end': {'name': os.environ.get(prefix + '_end', 'Return seeder'), 'id': -1}}
         self.params['default_z'] = int(os.environ.get(prefix + "_default_z", -300))
         self.params['action'] = os.environ.get(prefix + "_action", 'test')
-        filter = os.environ.get(prefix + "_filter_meta", "None")
-        save = os.environ.get(prefix + "_save_meta", "None")
+        filter = os.environ.get(prefix + "_filter_meta", "[('plant_stage', 'planted')]")
+        save = os.environ.get(prefix + "_save_meta", "[('plant_stage', 'planted')]")
 
         try:
             self.params['filter_meta'] = ast.literal_eval(filter)
@@ -188,7 +190,12 @@ class MLH(Farmware):
     # ------------------------------------------------------------------------------------------------------------------
     def run(self):
 
-        debug = True if self.params['action'] == "test" else False
+        if self.params['action'] == "test":
+            self.log("TEST MODE, no sequences or movement will be run, meta information will be updated",'warn')
+            debug=True
+        else:
+            debug=False
+
         points = self.get('points')
         sequences = self.get('sequences')
 
@@ -204,27 +211,29 @@ class MLH(Farmware):
 
         # filter points
         mypoints = [p for p in points if self.is_eligible(p)]
-        self.log("BEFORE")
-        for m in mypoints: self.log_point(m)
+        if len(mypoints)==0:
+            self.log('No plants selected by the filter, aborting', 'error')
+        else:
+            self.log('{} plants selected by the filter'.format(len(mypoints)),'success')
 
-        # sort points for optimal movement
-        mypoints = sorted(mypoints, key=lambda elem: (int(elem['x']), int(elem['y'])))
+            # sort points for optimal movement
+            mypoints = sorted(mypoints, key=lambda elem: (int(elem['x']), int(elem['y'])))
 
-        # execute init sequence
-        self.execute_sequence(self.params['sequence']['init'], debug)
+            # execute init sequence
+            self.execute_sequence(self.params['sequence']['init'], debug, 'INIT: ')
 
-        # iterate over all eligible points
-        for point in mypoints:
-            self.execute_sequence(self.params['sequence']['before'], debug)
-            if self.params['sequence']['before']['id']!=-1 or self.params['sequence']['after']['id']!=-1:
-                self.move_absolute({'x': point['x'], 'y': point['y'], 'z': self.params['default_z']},{'x': 0, 'y': 0, 'z': 0}, debug)
-            self.execute_sequence(self.params['sequence']['after'], debug)
-            self.save_meta(point)
+            # iterate over all eligible points
+            for point in mypoints:
+                self.execute_sequence(self.params['sequence']['before'], debug, 'BEFORE: ')
+                if self.params['sequence']['before']['id']!=-1 or self.params['sequence']['after']['id']!=-1:
+                    self.log_point(point,"Plant before procedure: ")
+                    self.move_absolute({'x': point['x'], 'y': point['y'], 'z': self.params['default_z']},{'x': 0, 'y': 0, 'z': 0}, debug)
+                self.execute_sequence(self.params['sequence']['after'], debug, 'AFTER: ')
+                self.save_meta(point)
+                self.log_point(point, "Plant after procedure: ")
 
-        # execute end sequence
-        self.execute_sequence(self.params['sequence']['end'], debug)
-        self.log("AFTER")
-        for m in mypoints: self.log_point(m)
+            # execute end sequence
+            self.execute_sequence(self.params['sequence']['end'], debug, "END: ")
 
 
 # ----------------------------------------------------------------------------------------------------------------------
