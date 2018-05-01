@@ -5,7 +5,7 @@ instance of a plant. For exmaple: if you have 10 carrots - you probably need to 
 individually. (Disclaimer: I seriously hope that I am missing something and there is a standard solution for this
 problem. But so far I don't know about any - so I wrote this farmware to help myself)
 
-#Solution:
+# Solution:
 
 The idea is to write a loop that executes needed sequences for each eligible plant.
 - Execute initial sequence                                  (Example: "Pick up seeder")
@@ -17,7 +17,7 @@ The idea is to write a loop that executes needed sequences for each eligible pla
     - Update plant tags 	                                (Example: "Mark this instance of carrot as "planted")
 - Execute final sequence                                    (Example: "Return seeder")
 
-#Reference:
+# Reference:
 
 - FILTER BY PLANT NAME
     - Filter by plant name (for example "Carrot"), case insensitive, "*" means select all
@@ -98,19 +98,19 @@ Delete watering tag from all plants that were watered today
 - SAVE IN META DATA:                [('del':'last_watering')]
 
 
-#Installation:
+# Installation:
 
 Use this manifest to register farmware
 https://raw.githubusercontent.com/etcipnja/MLH/master/MLH/manifest.json
 
-#Bugs:
+# Bugs:
 
 I noticed that if you change a parameter in WebApplication/Farmware form - you need to place focus on some other
 field before you click "RUN". Otherwise old value is  passed to farmware script even though the new value
 is displayed in the form.
 
 
-#Credits:
+# Credits:
 
 The original idea belongs to @renaud with his Loop-Plants-With-Filters. https://github.com/rdegosse/Loop-Plants-With-Filters/blob/master/README.md
 This Farmware - is a simplified version of it with nice perks about saving/filtering meta data
