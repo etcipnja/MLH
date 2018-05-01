@@ -8,14 +8,14 @@ problem. But so far I don't know about any - so I wrote this farmware to help my
 Solution:
 
 The idea is to write a loop that executes needed sequences for each eligible plant.
-- Execute initial sequence                                  (Example: "Pick up seeder")
 - Apply filters to select plants to be treated       		(Example: Select all Carrots with status "planned")
+- Execute initial sequence                                  (Example: "Pick up seeder")
 - For each plant:
     - Execute a sequence before moving to plant's location  (Example: "Grab a seed")
     - Move to plant's location
     - Execute a sequence at plant's location                (Example: "Plant a seed")
     - Update plant tags 	                                (Example: "Mark this instance of carrot as "planted")
-- Execute final sequence                                    (Example: "Return seeder")
+- Execute end sequence                                      (Example: "Return seeder")
 
 Reference:
 

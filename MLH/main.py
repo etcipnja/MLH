@@ -91,15 +91,15 @@ class MLH(Farmware):
         prefix = APP_NAME.lower().replace('-', '_')
         self.params = {}
 
-        self.params['pointname'] = os.environ.get(prefix + "_pointname", 'Cabbage')
-        self.params['sequence'] = {'init': {'name': os.environ.get(prefix + '_init', 'Pickup seeder'), 'id': -1},
-                                   'before': {'name': os.environ.get(prefix + '_before', 'Grab a seed'), 'id': -1},
-                                   'after': {'name': os.environ.get(prefix + '_after', 'Plant a seed'), 'id': -1},
-                                   'end': {'name': os.environ.get(prefix + '_end', 'Return seeder'), 'id': -1}}
+        self.params['pointname'] = os.environ.get(prefix + "_pointname", '*')
+        self.params['sequence'] = {'init': {'name': os.environ.get(prefix + '_init', 'None'), 'id': -1},
+                                   'before': {'name': os.environ.get(prefix + '_before', 'None'), 'id': -1},
+                                   'after': {'name': os.environ.get(prefix + '_after', 'None'), 'id': -1},
+                                   'end': {'name': os.environ.get(prefix + '_end', 'None'), 'id': -1}}
         self.params['default_z'] = int(os.environ.get(prefix + "_default_z", -300))
         self.params['action'] = os.environ.get(prefix + "_action", 'test')
         filter = os.environ.get(prefix + "_filter_meta", "[('plant_stage', 'planted')]")
-        save = os.environ.get(prefix + "_save_meta", "[('plant_stage', 'planted')]")
+        save = os.environ.get(prefix + "_save_meta", "[('plant_stage', 'planted'),('del','del1')]")
 
         try:
             self.params['filter_meta'] = ast.literal_eval(filter)
@@ -115,11 +115,6 @@ class MLH(Farmware):
 
 
         self.log(str(self.params))
-
-    # ------------------------------------------------------------------------------------------------------------------
-    def log_point(self, point, message='\t'):
-        self.log('{0:s} ({1:4d},{2:4d}) {3:s} - {4:s} {5}'.format(message, point['x'], point['y'], point['name'],
-                                                                  point['plant_stage'], point['meta']))
 
     # ------------------------------------------------------------------------------------------------------------------
     def is_eligible(self, p):
@@ -187,6 +182,8 @@ class MLH(Farmware):
             if need_update:
                 self.put("points/{}".format(point['id']), point)
 
+            return need_update
+
     # ------------------------------------------------------------------------------------------------------------------
     def run(self):
 
@@ -224,13 +221,14 @@ class MLH(Farmware):
 
             # iterate over all eligible points
             for point in mypoints:
+                message='Plant: ({:4d},{:4d}) {:s} - {:s} {}'.format(point['x'], point['y'], point['name'],point['plant_stage'], point['meta'])
                 self.execute_sequence(self.params['sequence']['before'], debug, 'BEFORE: ')
                 if self.params['sequence']['before']['id']!=-1 or self.params['sequence']['after']['id']!=-1:
-                    self.log_point(point,"Plant before procedure: ")
                     self.move_absolute({'x': point['x'], 'y': point['y'], 'z': self.params['default_z']},{'x': 0, 'y': 0, 'z': 0}, debug)
                 self.execute_sequence(self.params['sequence']['after'], debug, 'AFTER: ')
-                self.save_meta(point)
-                self.log_point(point, "Plant after procedure: ")
+                if self.save_meta(point):
+                    message+=' -> {}'.format(point['meta'])
+                self.log(message)
 
             # execute end sequence
             self.execute_sequence(self.params['sequence']['end'], debug, "END: ")
