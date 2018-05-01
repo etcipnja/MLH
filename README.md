@@ -122,7 +122,7 @@ is displayed in the form.
 
 # Credits:
 
-The original idea belongs to @renaud with his Loop-Plants-With-Filters. https://github.com/rdegosse/Loop-Plants-With-Filters/blob/master/README.md
+The original idea belongs to @rdegosse with his Loop-Plants-With-Filters. https://github.com/rdegosse/Loop-Plants-With-Filters/blob/master/README.md
 This Farmware - is a simplified version of it with nice perks about saving/filtering meta data
 
 Thank you,
