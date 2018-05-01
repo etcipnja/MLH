@@ -44,7 +44,7 @@ The idea is to write a loop that executes needed sequences for each eligible pla
 
 Meta data fields require specially formatted input. In Python it is called "list of tupple pairs". Here is the example:
 
-```PYTHON
+```
 [ ( ‘key1’, ‘value1’ ) , ( ‘key2’, ‘value2’ ) ]
 ```
 
@@ -62,6 +62,7 @@ deleted, otherwise only one key specified in ‘value’ is deleted
 # Examples:
 
 Seed all "planned" Carrots and mark them "planted"
+```
 - FILTER BY PLANT NAME:             Carrot
 - FILTER BY META DATA:              [('plant_stage':'planned')]
 - INIT SEQUENCE NAME:               Pickup seeder  (or whatever the name you have)
@@ -69,12 +70,14 @@ Seed all "planned" Carrots and mark them "planted"
 - SEQUENCE NAME AFTER MOVE:         Plant a seed
 - END SEQUENCE NAME:                Return seeder
 - SAVE IN META DATA:                [('plant_stage':'planted')]
+```
 
 Please note that if you interrupt this sequence and restart it - it won't start seeding again from the beginning becasue
 already seeded plants are marked as "planted" and won't be selected again.
 
 
 Water all "planted" Carrots that have not been watered today
+```
 - FILTER BY PLANT NAME:             Carrot
 - FILTER BY META DATA:              [('plant_stage':'planted'), ('last_watering':'!today')]
 - INIT SEQUENCE NAME:               Pickup watering nozzle
@@ -82,8 +85,10 @@ Water all "planted" Carrots that have not been watered today
 - SEQUENCE NAME AFTER MOVE:         Water light
 - END SEQUENCE NAME:                Return watering nozzle
 - SAVE IN META DATA:                [('last_watering':'today')]
+```
 
 Delete all meta data from all plants (does not affect plant_stage)
+```
 - FILTER BY PLANT NAME:             *
 - FILTER BY META DATA:              None
 - INIT SEQUENCE NAME:               None
@@ -91,8 +96,9 @@ Delete all meta data from all plants (does not affect plant_stage)
 - SEQUENCE NAME AFTER MOVE:         None
 - END SEQUENCE NAME:                None
 - SAVE IN META DATA:                [('del':'*')]
-
+```
 Delete watering tag from all plants that were watered today
+```
 - FILTER BY PLANT NAME:             *
 - FILTER BY META DATA:              [('last_watering':'today')]
 - INIT SEQUENCE NAME:               None
@@ -100,7 +106,7 @@ Delete watering tag from all plants that were watered today
 - SEQUENCE NAME AFTER MOVE:         None
 - END SEQUENCE NAME:                None
 - SAVE IN META DATA:                [('del':'last_watering')]
-
+```
 
 # Installation:
 
