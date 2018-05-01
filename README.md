@@ -44,8 +44,9 @@ The idea is to write a loop that executes needed sequences for each eligible pla
 
 Meta data fields require specially formatted input. In Python it is called "list of tupple pairs". Here is the example:
 
-```JSON
+```PYTHON
 [ ( ‘key1’, ‘value1’ ) , ( ‘key2’, ‘value2’ ) ]
+```
 
 You can use whatever you want as a ‘key' and ‘value’ as long as they are strings.
 More than one element in the list allows you to filter by multiple criteria and update multiple meta data tags at once!
