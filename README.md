@@ -1,4 +1,4 @@
-#Problem:
+# Problem:
 
 When you have to deal with a lot of plants you might be puzzled that you have to create a dedicated sequence for each
 instance of a plant. For exmaple: if you have 10 carrots - you probably need to create a watering sequence for every carrot
