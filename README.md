@@ -1,11 +1,11 @@
-Problem:
+# Problem:
 
 When you have to deal with a lot of plants you might be puzzled that you have to create a dedicated sequence for each
 instance of a plant. For exmaple: if you have 10 carrots - you probably need to create a watering sequence for every carrot
 individually. (Disclaimer: I seriously hope that I am missing something and there is a standard solution for this
 problem. But so far I don't know about any - so I wrote this farmware to help myself)
 
-Solution:
+# Solution:
 
 The idea is to write a loop that executes needed sequences for each eligible plant.
 - Apply filters to select plants to be treated       		(Example: Select all Carrots with status "planned")
@@ -17,7 +17,7 @@ The idea is to write a loop that executes needed sequences for each eligible pla
     - Update plant tags 	                                (Example: "Mark this instance of carrot as "planted")
 - Execute end sequence                                      (Example: "Return seeder")
 
-Reference:
+# Reference:
 
 - FILTER BY PLANT NAME
     - Filter by plant name (for example "Carrot"), case insensitive, "*" means select all
@@ -43,7 +43,11 @@ Reference:
     - OR "real" - for the real action
 
 Meta data fields require specially formatted input. In Python it is called "list of tupple pairs". Here is the example:
+
+```
 [ ( ‘key1’, ‘value1’ ) , ( ‘key2’, ‘value2’ ) ]
+```
+
 You can use whatever you want as a ‘key' and ‘value’ as long as they are strings.
 More than one element in the list allows you to filter by multiple criteria and update multiple meta data tags at once!
 Put "None" if you want to skip metadata feature.
@@ -55,9 +59,10 @@ in Farm Designer for every plant. Only valid values that go with this key are �
 deleted, otherwise only one key specified in ‘value’ is deleted
 - value ‘today’ is replaced with actual today’s date. In FILTER you can write ‘!today’ which means “not today’.
 
-Examples:
+# Examples:
 
 Seed all "planned" Carrots and mark them "planted"
+```
 - FILTER BY PLANT NAME:             Carrot
 - FILTER BY META DATA:              [('plant_stage':'planned')]
 - INIT SEQUENCE NAME:               Pickup seeder  (or whatever the name you have)
@@ -65,12 +70,14 @@ Seed all "planned" Carrots and mark them "planted"
 - SEQUENCE NAME AFTER MOVE:         Plant a seed
 - END SEQUENCE NAME:                Return seeder
 - SAVE IN META DATA:                [('plant_stage':'planted')]
+```
 
 Please note that if you interrupt this sequence and restart it - it won't start seeding again from the beginning becasue
 already seeded plants are marked as "planted" and won't be selected again.
 
 
 Water all "planted" Carrots that have not been watered today
+```
 - FILTER BY PLANT NAME:             Carrot
 - FILTER BY META DATA:              [('plant_stage':'planted'), ('last_watering':'!today')]
 - INIT SEQUENCE NAME:               Pickup watering nozzle
@@ -78,8 +85,10 @@ Water all "planted" Carrots that have not been watered today
 - SEQUENCE NAME AFTER MOVE:         Water light
 - END SEQUENCE NAME:                Return watering nozzle
 - SAVE IN META DATA:                [('last_watering':'today')]
+```
 
 Delete all meta data from all plants (does not affect plant_stage)
+```
 - FILTER BY PLANT NAME:             *
 - FILTER BY META DATA:              None
 - INIT SEQUENCE NAME:               None
@@ -87,8 +96,9 @@ Delete all meta data from all plants (does not affect plant_stage)
 - SEQUENCE NAME AFTER MOVE:         None
 - END SEQUENCE NAME:                None
 - SAVE IN META DATA:                [('del':'*')]
-
+```
 Delete watering tag from all plants that were watered today
+```
 - FILTER BY PLANT NAME:             *
 - FILTER BY META DATA:              [('last_watering':'today')]
 - INIT SEQUENCE NAME:               None
@@ -96,23 +106,23 @@ Delete watering tag from all plants that were watered today
 - SEQUENCE NAME AFTER MOVE:         None
 - END SEQUENCE NAME:                None
 - SAVE IN META DATA:                [('del':'last_watering')]
+```
 
-
-Installation:
+# Installation:
 
 Use this manifest to register farmware
 https://raw.githubusercontent.com/etcipnja/MLH/master/MLH/manifest.json
 
-Bugs:
+# Bugs:
 
 I noticed that if you change a parameter in WebApplication/Farmware form - you need to place focus on some other
 field before you click "RUN". Otherwise old value is  passed to farmware script even though the new value
 is displayed in the form.
 
 
-Credits:
+# Credits:
 
-The original idea belongs to @renaud with his Loop-Plants-With-Filters. https://github.com/rdegosse/Loop-Plants-With-Filters/blob/master/README.md
+The original idea belongs to @rdegosse with his Loop-Plants-With-Filters. https://github.com/rdegosse/Loop-Plants-With-Filters/blob/master/README.md
 This Farmware - is a simplified version of it with nice perks about saving/filtering meta data
 
 Thank you,
