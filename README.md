@@ -64,12 +64,12 @@ deleted, otherwise only one key specified in ‘value’ is deleted
 Seed all "planned" Carrots and mark them "planted"
 ```
 - FILTER BY PLANT NAME:             Carrot
-- FILTER BY META DATA:              [('plant_stage':'planned')]
+- FILTER BY META DATA:              [('plant_stage','planned')]
 - INIT SEQUENCE NAME:               Pickup seeder  (or whatever the name you have)
 - SEQUENCE NAME BEFORE NEXT MOVE:   Pickup a seed
 - SEQUENCE NAME AFTER MOVE:         Plant a seed
 - END SEQUENCE NAME:                Return seeder
-- SAVE IN META DATA:                [('plant_stage':'planted')]
+- SAVE IN META DATA:                [('plant_stage','planted')]
 ```
 
 Please note that if you interrupt this sequence and restart it - it won't start seeding again from the beginning becasue
@@ -79,12 +79,12 @@ already seeded plants are marked as "planted" and won't be selected again.
 Water all "planted" Carrots that have not been watered today
 ```
 - FILTER BY PLANT NAME:             Carrot
-- FILTER BY META DATA:              [('plant_stage':'planted'), ('last_watering':'!today')]
+- FILTER BY META DATA:              [('plant_stage','planted'), ('last_watering','!today')]
 - INIT SEQUENCE NAME:               Pickup watering nozzle
 - SEQUENCE NAME BEFORE NEXT MOVE:   None
 - SEQUENCE NAME AFTER MOVE:         Water light
 - END SEQUENCE NAME:                Return watering nozzle
-- SAVE IN META DATA:                [('last_watering':'today')]
+- SAVE IN META DATA:                [('last_watering','today')]
 ```
 
 Delete all meta data from all plants (does not affect plant_stage)
@@ -95,17 +95,17 @@ Delete all meta data from all plants (does not affect plant_stage)
 - SEQUENCE NAME BEFORE NEXT MOVE:   None
 - SEQUENCE NAME AFTER MOVE:         None
 - END SEQUENCE NAME:                None
-- SAVE IN META DATA:                [('del':'*')]
+- SAVE IN META DATA:                [('del','*')]
 ```
 Delete watering tag from all plants that were watered today
 ```
 - FILTER BY PLANT NAME:             *
-- FILTER BY META DATA:              [('last_watering':'today')]
+- FILTER BY META DATA:              [('last_watering','today')]
 - INIT SEQUENCE NAME:               None
 - SEQUENCE NAME BEFORE NEXT MOVE:   None
 - SEQUENCE NAME AFTER MOVE:         None
 - END SEQUENCE NAME:                None
-- SAVE IN META DATA:                [('del':'last_watering')]
+- SAVE IN META DATA:                [('del','last_watering')]
 ```
 
 # Installation:
