@@ -20,7 +20,7 @@ The idea is to write a loop that executes needed sequences for each eligible pla
 # Reference:
 
 - FILTER BY PLANT NAME
-    - Filter by plant names (comma separated) for example "Carrot, Beets", case insensitive, "*" means select all
+    - Filter by plant names (comma separated) for example "Carrot, Beets", case insensitive, '*' means select all
 - FILTER BY META DATA
     - MetaData is a piece of information (key:value) saved with the plant. Unfortunatelly you won't see it anywhere on
     the Farm Designer, but it is printed to the log. This farmware can update metadata, so you can use it in the
