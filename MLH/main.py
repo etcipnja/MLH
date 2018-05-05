@@ -3,6 +3,7 @@ import json
 import requests
 import ast
 import datetime
+import sys
 
 APP_NAME = ((__file__.split(os.sep))[len(__file__.split(os.sep)) - 3]).replace('-master', '')
 
@@ -82,7 +83,6 @@ class Farmware():
 
 
 class MLH(Farmware):
-    # ------------------------------------------------------------------------------------------------------------------
     def __init__(self):
         Farmware.__init__(self)
 
@@ -241,9 +241,11 @@ if __name__ == "__main__":
         app = MLH()
         app.load_config()
         app.run()
+        sys.exit(0)
 
     except Exception as e:
         try:
             app.log('Something went wrong: {}'.format(str(e)), 'error')
         except:
             print('Something really bad happened: {}.'.format(e))
+    sys.exit(1)
