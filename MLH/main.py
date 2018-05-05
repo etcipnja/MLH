@@ -34,8 +34,6 @@ class MLH(Farmware):
         except:
             raise ValueError("Invalid meta {} or {}".format(filter, save))
 
-
-
         self.log(str(self.params))
 
     # ------------------------------------------------------------------------------------------------------------------
