@@ -1,9 +1,9 @@
 import os
 import ast
 import datetime
+from dateutil import tz
 import sys
 import requests
-import json
 from Farmware import Farmware
 
 class MLH(Farmware):
@@ -11,42 +11,73 @@ class MLH(Farmware):
         Farmware.__init__(self,((__file__.split(os.sep))[len(__file__.split(os.sep)) - 3]).replace('-master', ''))
 
     # ------------------------------------------------------------------------------------------------------------------
+    # loads config parameters
     def load_config(self):
         prefix = self.app_name.lower().replace('-', '_')
-        self.p = {}
-        self.p['s']={}
-        self.p['pointname']     = os.environ.get(prefix + "_pointname", '*').lower().replace(' ','').split(',')
-        self.p['default_z']     = int(os.environ.get(prefix + "_default_z", -300))
-        self.p['action']        = os.environ.get(prefix + "_action", 'test')
-        self.p['filter_meta']   = os.environ.get(prefix + "_filter_meta", 'None')
-        self.p['save_meta']     = os.environ.get(prefix + "_save_meta", "None")
-        self.p['s']['init']     = os.environ.get(prefix + '_init', 'None')
-        self.p['s']['before']   = os.environ.get(prefix + '_before', 'None')
-        self.p['s']['after']    = os.environ.get(prefix + '_after', 'Water [MLH]')
-        self.p['s']['end']      = os.environ.get(prefix + '_end', 'None')
+        self.args = {}
+        self.args['s']={}
+        self.args['pointname']     = os.environ.get(prefix + "_pointname", '*')
+        self.args['default_z']     = int(os.environ.get(prefix + "_default_z", -300))
+        self.args['action']        = os.environ.get(prefix + "_action", 'test')
+        self.args['filter_meta']   = os.environ.get(prefix + "_filter_meta", "None")
+        self.args['save_meta']     = os.environ.get(prefix + "_save_meta", "[('del','last_watering')]")
+        self.args['s']['init']     = os.environ.get(prefix + '_init', 'None')
+        self.args['s']['before']   = os.environ.get(prefix + '_before', 'None')
+        self.args['s']['after']    = os.environ.get(prefix + '_after', 'Water [MLH]')
+        self.args['s']['end']      = os.environ.get(prefix + '_end', 'None')
 
         try:
-            self.p['filter_meta'] = ast.literal_eval(self.p['filter_meta'])
-            self.p['save_meta'] = ast.literal_eval(self.p['save_meta'])
+            self.args['pointname']=self.args['pointname'].lower().replace(' ', '').split(',')
+            self.args['filter_meta'] = ast.literal_eval(self.args['filter_meta'])
+            self.args['save_meta'] = ast.literal_eval(self.args['save_meta'])
 
-            if not isinstance(self.p['filter_meta'], list) and self.p['filter_meta']!=None:
+            if not isinstance(self.args['filter_meta'], list) and self.args['filter_meta']!=None:
                 raise ValueError
-            if not isinstance(self.p['save_meta'], list) and self.p['save_meta']!=None:
+            if not isinstance(self.args['save_meta'], list) and self.args['save_meta']!=None:
                 raise ValueError
         except:
-            raise ValueError("Invalid meta {} or {}".format(self.p['filter_meta'], self.p['save_meta']))
+            raise ValueError("Invalid meta {} or {}".format(self.args['filter_meta'], self.args['save_meta']))
 
-        self.log(str(self.p))
+        self.log(str(self.args))
 
-     # ------------------------------------------------------------------------------------------------------------------
+    # ------------------------------------------------------------------------------------------------------------------
+    # Converts UTC date represented by a string into local date represented by a string
+    def u2l(self, utc_s):
+        d = datetime.datetime.strptime(utc_s, "%Y-%m-%dT%H:%M:%S.%fZ")
+        d = d.replace(tzinfo=tz.tzutc())
+        d = d.astimezone(tz.tzlocal())
+        local_s = d.strftime("%B %d, %Y")
+        return local_s
+
+    # ------------------------------------------------------------------------------------------------------------------
+    # Converts local date represented by a string into UTC date represented by a string
+    def l2u(self, local_s=''):
+        if local_s.lower()=='none': return None
+        if local_s!='':
+            d = datetime.datetime.strptime(local_s, "%B %d, %Y")
+        else:
+            d=datetime.date.today()
+        d = d.replace(tzinfo=tz.tzlocal())
+        d = d.astimezone(tz.tzutc())
+        local_s = d.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+        return local_s
+
+    # ------------------------------------------------------------------------------------------------------------------
+    # inverses boolean expr basing on variable
+    def invb(self, inverse, expr):
+        if not inverse: return expr
+        else: return not expr
+
+    # ------------------------------------------------------------------------------------------------------------------
+    # returns true if point is matching filtering criteria
     def is_eligible_point(self, p):
 
         if p['pointer_type'].lower() != 'plant': return False
-        if p['name'].lower() not in self.p['pointname'] and '*' not in self.p['pointname']: return False
+        if p['name'].lower() not in self.args['pointname'] and '*' not in self.args['pointname']: return False
 
         # need to search by meta
-        if self.p['filter_meta'] != None:
-            for t in self.p['filter_meta']:
+        if self.args['filter_meta'] != None:
+            for t in self.args['filter_meta']:
                 key=t[0]
                 val = t[1]
                 inverse = False
@@ -56,149 +87,138 @@ class MLH(Farmware):
                 if val.lower() == 'today': val = datetime.date.today().strftime("%B %d, %Y")
 
                 if key == 'plant_stage':
-                    if inverse:
-                        if p[key] == val: return False
-                    else:
-                        if p[key] != val: return False
+                    if not self.invb(inverse, p[key] == val): return False
                 elif key == 'planted_at':
                     if p['planted_at']==None:
-                        if inverse: return val.lower()!='none'
-                        else: return val.lower()=='none'
-                    d = datetime.datetime.strptime(p['planted_at'], "%Y-%m-%dT%H:%M:%S.%fZ").date()
-                    dv=d.strftime("%B %d, %Y")
-                    if inverse:
-                        if dv == val: return False
-                    else:
-                        if dv != val: return False
+                        if not self.invb(inverse, val.lower()=='none'): return False
+                    dv=self.u2l(p['planted_at'])
+                    if not self.invb(inverse, dv == val): return False
                 else:
                     if key in p['meta']:
                         if val!='*':
-                            if inverse:
-                                if p['meta'][key] == val: return False
-                            else:
-                                if p['meta'][key] != val: return False
+                            if not self.invb(inverse, p['meta'][key] == val): return False
                     else:
                         if not inverse: return False
 
         return True
 
     # ------------------------------------------------------------------------------------------------------------------
-    def save_meta(self, point, debug):
-        if self.p['save_meta'] != None:
-            need_update = False
+    # update metadata
+    def update_meta(self, p):
 
-            for t in self.p['save_meta']:
+        need_update = False
+        if self.args['save_meta'] != None:
+            for t in self.args['save_meta']:
                 key=t[0]
                 val = t[1]
                 if val.lower() == 'today': val = datetime.date.today().strftime("%B %d, %Y")
 
                 # check for special values
                 if key == 'del':
-                    if val == '*' and point['meta'] != {}:
-                        point['meta'] = {}
+                    if val == '*' and p['meta'] != {}:
+                        p['meta'] = {}
                         need_update = True
                     else:
-                        if val in point['meta']:
-                            del point['meta'][val]
+                        if val in p['meta']:
+                            del p['meta'][val]
                             need_update = True
                 else:
                     if key=='plant_stage':
-                        if point[key]!=val:
-                            point[key] = val
-                            if val=='planned': point['planted_at']=None
-                            if val == 'planted': point['planted_at'] = datetime.date.today().strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+                        if p[key]!=val:
+                            p[key] = val
+                            if val=='planned': p['planted_at']=None
+                            if val == 'planted': p['planted_at'] = self.l2u()
                             need_update = True
                     elif key == 'planted_at':
                         skip=False
-                        if point['planted_at']!=None:
-                            d = datetime.datetime.strptime(point['planted_at'], "%Y-%m-%dT%H:%M:%S.%fZ").date()
-                            dv = d.strftime("%B %d, %Y")
-                            if dv==val: skip=True
+                        if p['planted_at']!=None:
+                            if self.u2l(p['planted_at'])==val: skip=True
                         if not skip:
-                            d = datetime.datetime.strptime(val, "%B %d, %Y").date()
-                            dv = d.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
-                            point[key] = dv
+                            p[key] = self.l2u(val)
                             need_update = True
-                    elif not (key in point['meta'] and point['meta'][key] == val):
-                            point['meta'][key] = val
+                    elif not (key in p['meta'] and p['meta'][key] == val):
+                            p['meta'][key] = val
                             need_update = True
 
-            if need_update and not debug:
-                self.put("points/{}".format(point['id']), point)
-
-            return need_update
+        return need_update
 
     # ------------------------------------------------------------------------------------------------------------------
-    def prepare_sequence(self, sequence, plant, weather, debug):
+    def intelligent_watering(self, sequence, p, weather):
 
-        if plant['plant_stage'] != 'planted': return False
+        if p['plant_stage'] != 'planted': return False
 
         age=1 #default age
-        if plant['planted_at']!=None:
-            planted_at=datetime.datetime.strptime(plant['planted_at'], "%Y-%m-%dT%H:%M:%S.%fZ").date()
+        if p['planted_at']!=None:
+            planted_at=datetime.datetime.strptime(p['planted_at'], "%Y-%m-%dT%H:%M:%S.%fZ").date()
             age=(datetime.datetime.now().date()-planted_at).days
 
         rain_total_3=sum(weather[key]['rain24'] for key in weather.keys()
                          if (datetime.date.today()-datetime.datetime.strptime(key, "%B %d, %Y").date()).days<3)
 
         # 1mm of rain is 1000ml of water over 1m2 or 10ml over 10x10sm (under the head)
-        # 1 sec or watering is 80ml
+        # 1 sec or watering is 80ml (in my case)
 
-        #what I believe plants need every day
-        watering_needs={'Carrot':   [50, 50, 50, 50,  50],
-                        'Beets':    [50, 50, 50, 50,  50],
+        #what I believe plants need every day in ml
+        #                Name        W1  W2  W3  W4   W5   W6   W7    W8
+        watering_needs={'Carrot':   [50, 50, 50, 50,  50,  50,  50,   50],
+                        'Beets':    [50, 50, 50, 50,  50,  50,  50,   50],
                         'Zucchini': [50, 50, 50, 450, 400, 400, 400, 400],
-                        'Cabbage':  [50, 50, 50, 100, 150],
+                        'Cabbage':  [50, 50, 50, 100, 400, 400, 400, 400],
                         'Parsley':  [50, 50, 50, 400, 400, 400, 400, 400]
                         }
 
         supposed_watering_3=0
         try:
             for i in (int((age-3)/7),int((age-2)/7),int((age-1)/7)):
-                supposed_watering_3+=watering_needs[plant['name']][int((age-i)/7)]
+                supposed_watering_3+=watering_needs[p['name']][int((age - i) / 7)]
         except:
-            raise ValueError('There is no watering plan for {}, aborting'.format(plant['name']))
+            raise ValueError('There is no watering plan for {}, aborting'.format(p['name']))
 
-        water_today=watering_needs[plant['name']][int(age/7)]
-        ms=int(water_today/80.0*1000)
+        ml=watering_needs[p['name']][int(age / 7)]
+        ms=int(ml/80.0*1000)
 
-        self.log("Intelligent watering of {} {} days old for {}ml or {}ms".format(plant['name'],age,water_today,ms))
+        self.log("Intelligent watering of {} {} days old for {}ml or {}ms".format(p['name'], age, ml, ms))
+
+        #update watering sequence if needed
         try:
             duration=ms
             wait = next(x for x in sequence['body'] if x['kind'] == 'wait')
             if wait['args']['milliseconds']!=duration:
                 wait['args']['milliseconds'] = duration
                 self.log('Updating "{}" with {}ms and syncing ...'.format(sequence['name'],duration))
-                if not debug: self.put("sequences/{}".format(sequence['id']), sequence)
+                self.put("sequences/{}".format(sequence['id']), sequence)
                 self.sync()
         except:
             raise ValueError("Update of watering sequence failed")
 
+        #record watering amount into the meta
+        if 'intelligent_watering' not in p['meta']: p['meta']['intelligent_watering']={}
+        p['meta']['intelligent_watering'][datetime.date.today().strftime("%B %d, %Y")]=ml
+
         return True
 
     # ------------------------------------------------------------------------------------------------------------------
-    def to_str(self, point):
-        str = '{:s}'.format(point['plant_stage'])
-        if point['plant_stage']=='planted' and point['planted_at'] != None:
-            d = datetime.datetime.strptime(point['planted_at'], "%Y-%m-%dT%H:%M:%S.%fZ").date()
-            str += '({})'.format(d.strftime("%B %d, %Y"))
-        str += ' {}'.format(point['meta'])
+    def to_str(self, p):
+        str = '{:s}'.format(p['plant_stage'])
+        if p['planted_at'] != None:
+            str += '({:15s})'.format(self.u2l(p['planted_at']))
+        str += ' {}'.format(p['meta'])
         return str
 
     # ------------------------------------------------------------------------------------------------------------------
     def run(self):
 
-        debug = False
-        if self.p['action'] == "test":
+        if self.args['action'] == "test":
             self.log("TEST MODE, no sequences or movement will be run, meta information will NOT be updated",'warn')
-            debug=True
+            self.debug=True
 
         #processing points
         points = self.get('points')
         # filter points
-        points = [p for p in points if self.is_eligible_point(p)]
+        points = [x for x in points if self.is_eligible_point(x)]
         if len(points) == 0:
-            raise ValueError('No plants selected by the filter, aborting')
+            self.log('No plants selected by the filter, aborting','warn')
+            return
 
         self.log('{} plants selected by the filter'.format(len(points)), 'success')
         points = sorted(points, key=lambda elem: ( elem['name'], int(elem['x']), int(elem['y'])))
@@ -206,60 +226,66 @@ class MLH(Farmware):
         #processing sequences
         all_s = self.get('sequences')
         try:
-            for k in self.p['s']:
-                if self.p['s'][k].lower()=='none': self.p['s'][k]=None
-                else: self.p['s'][k]=next(i for i in all_s if i['name'].lower() == self.p['s'][k].lower())
+            for k in self.args['s']:
+                if self.args['s'][k].lower()== 'none': self.args['s'][k]=None
+                else: self.args['s'][k]=next(i for i in all_s if i['name'].lower() == self.args['s'][k].lower())
         except:
-            raise ValueError('Sequence not found: {}'.format(self.p['s'][k].upper()))
+            raise ValueError('Sequence not found: {}'.format(self.args['s'][k].upper()))
 
         #check if we need to enable intelligent watering
         intel_watering=False
-        if self.p['s']['after']!=None:
-            if 'water' in self.p['s']['after']['name'].lower() and '[mlh]' in  self.p['s']['after']['name'].lower():
+        weather={}
+        if self.args['s']['after']!=None:
+            if 'water' in self.args['s']['after']['name'].lower() and '[mlh]' in self.args['s']['after']['name'].lower():
                 try:
                     wf = open('/tmp/current_weather', 'r')
                     weather = ast.literal_eval(wf.read())
                     if not isinstance(weather, dict): raise ValueError
-                    self.log('Current weather {}'.format(weather))
+                    self.log('Weather readings {}'.format(weather))
                     intel_watering = True
                 except Exception as e:
                     weather = {}
-                    self.log('No weather information availabe, consider installing Netatmo farmware and run it before this',
-                             'warn')
+                    self.log('No weather information availabe, install Netatmo farmware and run it before this','warn')
 
         # execute init sequence
-        self.execute_sequence(self.p['s']['init'], debug, 'INIT: ')
+        self.execute_sequence(self.args['s']['init'], 'INIT: ')
 
         # iterate over all eligible points
-        for point in points:
-            message = 'Plant: ({:4d},{:4d}) {:s} - {:s}'.format(point['x'], point['y'], point['name'],self.to_str(point))
-            skip=False
-            if intel_watering and point['plant_stage']!='planted': skip=True
-            if not skip:
-                self.execute_sequence(self.p['s']['before'], debug, 'BEFORE: ')
-                if self.p['s']['before']!=None or self.p['s']['after']!=None:
-                    self.move_absolute({'x': point['x'], 'y': point['y'], 'z': self.p['default_z']},{'x': 0, 'y': 0, 'z': 0}, debug)
+        for plant in points:
+            need_update = False
+            message = 'Plant: ({:4d},{:4d}) {:15s} - {:s}'.format(plant['x'], plant['y'], plant['name'],self.to_str(plant))
+            if not intel_watering or plant['plant_stage']=='planted':
+                self.execute_sequence(self.args['s']['before'], 'BEFORE: ')
+                if self.args['s']['before']!=None or self.args['s']['after']!=None:
+                    self.move_absolute({'x': plant['x'], 'y': plant['y'], 'z': self.args['default_z']})
                 if intel_watering:
-                    self.prepare_sequence(self.p['s']['after'],point, weather, debug)
-                self.execute_sequence(self.p['s']['after'], debug, 'AFTER: ')
+                    if self.intelligent_watering(self.args['s']['after'], plant, weather): need_update=True
+                self.execute_sequence(self.args['s']['after'], 'AFTER: ')
             else: message='SKIPPED-AS-NON-PLANTED: '+message
-            if self.save_meta(point, debug):
-                message+=' -> {}'.format(self.to_str(point))
+            if self.update_meta(plant): need_update=True
+
+            if need_update:
+                message += ' -> {}'.format(self.to_str(plant))
+                self.put("points/{}".format(plant['id']), plant)
+
             self.log(message)
 
         # execute end sequence
-        self.execute_sequence(self.p['s']['end'], debug, "END: ")
+        self.execute_sequence(self.args['s']['end'], "END: ")
 
 
 # ----------------------------------------------------------------------------------------------------------------------
 if __name__ == "__main__":
 
+    app = MLH()
     try:
-        app = MLH()
         app.load_config()
         app.run()
         sys.exit(0)
 
+    except NameError as error:
+        app.log('SYNTAX!: {}'.format(str(error)), 'error')
+        raise
     except requests.exceptions.HTTPError as error:
         app.log('HTTP error {} {} '.format(error.response.status_code,error.response.text), 'error')
     except Exception as e:
