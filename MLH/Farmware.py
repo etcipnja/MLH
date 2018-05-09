@@ -16,7 +16,6 @@ class Farmware:
     def log(self, message, message_type='info'):
 
         try:
-            raise ValueError
             log_message = '[{}] {}'.format(self.app_name, message)
             node = {'kind': 'send_message', 'args': {'message': log_message, 'message_type': message_type}}
             response = requests.post(os.environ['FARMWARE_URL'] + 'api/v1/celery_script', data=json.dumps(node),headers=self.headers)
