@@ -16,6 +16,7 @@ class Farmware:
     def log(self, message, message_type='info'):
 
         try:
+            raise ValueError
             log_message = '[{}] {}'.format(self.app_name, message)
             node = {'kind': 'send_message', 'args': {'message': log_message, 'message_type': message_type}}
             response = requests.post(os.environ['FARMWARE_URL'] + 'api/v1/celery_script', data=json.dumps(node),headers=self.headers)
@@ -26,8 +27,25 @@ class Farmware:
         print(message)
 
     # ------------------------------------------------------------------------------------------------------------------
+    def sync(self):
+        node = {'kind': 'sync', 'args': {}}
+        response = requests.post(os.environ['FARMWARE_URL'] + 'api/v1/celery_script', data=json.dumps(node),headers=self.headers)
+        response.raise_for_status()
+
+    # ------------------------------------------------------------------------------------------------------------------
     def get(self, enpoint):
         response = requests.get(self.api_url + enpoint, headers=self.headers)
+        response.raise_for_status()
+        return response.json()
+
+    # ------------------------------------------------------------------------------------------------------------------
+    def delete(self, enpoint):
+        response = requests.delete(self.api_url + enpoint, headers=self.headers)
+        response.raise_for_status()
+        return response.json()
+    # ------------------------------------------------------------------------------------------------------------------
+    def post(self, enpoint, data):
+        response = requests.put(self.api_url + enpoint, headers=self.headers, data=json.dumps(data))
         response.raise_for_status()
         return response.json()
 
@@ -38,10 +56,16 @@ class Farmware:
         return response.json()
 
     # ------------------------------------------------------------------------------------------------------------------
+    def patch(self, enpoint, data):
+        response = requests.patch(self.api_url + enpoint, headers=self.headers, data=json.dumps(data))
+        response.raise_for_status()
+        return response.json()
+
+    # ------------------------------------------------------------------------------------------------------------------
     def execute_sequence(self, sequence, debug=False, message=''):
-        if sequence['id'] != -1:
+        if sequence != None:
             if message != None:
-                self.log('{}Executing sequence: {}({})'.format(message, sequence['name'], sequence['id']))
+                self.log('{}Executing sequence: {}({})'.format(message, sequence['name'].upper(), sequence['id']))
             if not debug:
                 node = {'kind': 'execute', 'args': {'sequence_id': sequence['id']}}
                 response = requests.post(os.environ['FARMWARE_URL'] + 'api/v1/celery_script', data=json.dumps(node),
