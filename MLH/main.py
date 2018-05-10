@@ -4,7 +4,6 @@ import datetime
 import sys
 import requests
 from Farmware import Farmware
-import calendar
 
 
 class MLH(Farmware):
@@ -39,20 +38,15 @@ class MLH(Farmware):
         except:
             raise ValueError("Invalid meta {} or {}".format(self.args['filter_meta'], self.args['save_meta']))
 
+        self.device=self.get('device')
+
         self.log(str(self.args))
 
-    #------------------------------------------------------------------------------------------------------------------
-    def utc_to_local(self, utc_dt):
-        # get integer timestamp to avoid precision lost
-        timestamp = calendar.timegm(utc_dt.timetuple())
-        local_dt = datetime.fromtimestamp(timestamp)
-        assert utc_dt.resolution >= timedelta(microseconds=1)
-        return local_dt.replace(microsecond=utc_dt.microsecond)
     # ------------------------------------------------------------------------------------------------------------------
     # Converts UTC date represented by a string into local date represented by a string
     def u2l(self, utc_s):
         d = datetime.datetime.strptime(utc_s, "%Y-%m-%dT%H:%M:%S.%fZ")
-        d=self.utc_to_local(d)
+        d += datetime.timedelta(hours=self.device['tz_offset_hrs'])
         local_s = d.strftime("%B %d, %Y")
         return local_s
 
@@ -64,8 +58,7 @@ class MLH(Farmware):
             d = datetime.datetime.strptime(local_s, "%B %d, %Y")
         else:
             d=datetime.date.today()
-        d = d.replace(tzinfo=tz.tzlocal())
-        d = d.astimezone(tz.tzutc())
+        d -= datetime.timedelta(hours=self.device['tz_offset_hrs'])
         local_s = d.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
         return local_s
 
