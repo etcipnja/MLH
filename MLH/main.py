@@ -45,7 +45,6 @@ class MLH(Farmware):
     # ------------------------------------------------------------------------------------------------------------------
     # Converts UTC date represented by a string into local date represented by a string
     def u2l(self, utc_s):
-        self.log(utc_s)
         d = datetime.datetime.strptime(utc_s, "%Y-%m-%dT%H:%M:%S.%fZ")
         d += datetime.timedelta(hours=self.device['tz_offset_hrs'])
         local_s = d.strftime("%B %d, %Y")
@@ -73,7 +72,6 @@ class MLH(Farmware):
     # returns true if point is matching filtering criteria
     def is_eligible_point(self, p):
 
-        self.log(p)
         if p['pointer_type'].lower() != 'plant': return False
         if p['name'].lower() not in self.args['pointname'] and '*' not in self.args['pointname']: return False
 
