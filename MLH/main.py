@@ -18,12 +18,12 @@ class MLH(Farmware):
         self.args['s']={}
         self.args['pointname']     = os.environ.get(prefix + "_pointname", '*')
         self.args['default_z']     = int(os.environ.get(prefix + "_default_z", -300))
-        self.args['action']        = os.environ.get(prefix + "_action", 'test')
+        self.args['action']        = os.environ.get(prefix + "_action", 'real')
         self.args['filter_meta']   = os.environ.get(prefix + "_filter_meta", "None")
         self.args['save_meta']     = os.environ.get(prefix + "_save_meta", "None")
         self.args['s']['init']     = os.environ.get(prefix + '_init', 'None')
         self.args['s']['before']   = os.environ.get(prefix + '_before', 'None')
-        self.args['s']['after']    = os.environ.get(prefix + '_after', 'Water [MLH]')
+        self.args['s']['after']    = os.environ.get(prefix + '_after', 'Fake Water [MLH]')
         self.args['s']['end']      = os.environ.get(prefix + '_end', 'None')
 
         try:
@@ -143,9 +143,13 @@ class MLH(Farmware):
         return need_update
 
     # ------------------------------------------------------------------------------------------------------------------
+    #updates the watering sequence and meta. Returns True if waterign is needed
     def intelligent_watering(self, sequence, p, weather):
 
         if p['plant_stage'] != 'planted': return False
+
+        today=datetime.date.today()
+        today_s=today.strftime("%B %d, %Y")
 
         age=1 #default age
         if p['planted_at']!=None:
@@ -167,35 +171,52 @@ class MLH(Farmware):
                         'Parsley':  [50, 50, 50, 400, 400, 400, 400, 400]
                         }
 
+        #getting supposed watering for 3 days
         supposed_watering_3=0
         try:
-            for i in (int((age-3)/7),int((age-2)/7),int((age-1)/7)):
-                supposed_watering_3+=watering_needs[p['name']][int((age - i) / 7)]
+            for i in range(0,3):
+                if (age-i>0):
+                    week=(age-i)/7
+                    supposed_watering_3+=watering_needs[p['name']][week]
         except:
-            raise ValueError('There is no watering plan for {}, aborting'.format(p['name']))
+            raise ValueError('There is no watering plan for {} for W{}, aborting'.format(p['name'],week))
 
-        ml=watering_needs[p['name']][int(age / 7)]
-        ms=int(ml/80.0*1000)
+        #getting actual watering
+        if 'intelligent_watering' not in p['meta']: p['meta']['intelligent_watering'] = '[]'
+        watering=dict(map(lambda x: x, ast.literal_eval(p['meta']['intelligent_watering'])))
+        watering = {k: v for (k, v) in watering.items()
+                    if today - datetime.datetime.strptime(k, "%B %d, %Y").date() < datetime.timedelta(days=7)}
+        actual_watering_3=sum(watering[k] for k in watering.keys()
+                    if today-datetime.datetime.strptime(k, "%B %d, %Y").date() <datetime.timedelta(days=3))
 
-        self.log("Intelligent watering of {} {} days old for {}ml or {}ms".format(p['name'], age, ml, ms))
+        ml=int(round(supposed_watering_3-actual_watering_3-rain_total_3))
+        if ml<0: ml=0
+        ms = int(ml / 80.0 * 1000)
 
-        #update watering sequence if needed
-        try:
-            duration=ms
-            wait = next(x for x in sequence['body'] if x['kind'] == 'wait')
-            if wait['args']['milliseconds']!=duration:
-                wait['args']['milliseconds'] = duration
-                self.log('Updating "{}" with {}ms and syncing ...'.format(sequence['name'],duration))
-                self.put("sequences/{}".format(sequence['id']), sequence)
-                self.sync()
-        except:
-            raise ValueError("Update of watering sequence failed")
+        self.log("Plant {} of age {}d last 3d watering was {}/{}ml -> watering for {}ml({}ms)".
+                 format(p['name'], age, actual_watering_3, supposed_watering_3, ml, ms))
 
-        #record watering amount into the meta
-        if 'intelligent_watering' not in p['meta']: p['meta']['intelligent_watering']={}
-        p['meta']['intelligent_watering'][datetime.date.today().strftime("%B %d, %Y")]=ml
+        if ml>10:
 
-        return True
+            #update watering sequence if needed
+            if ms > 60000: raise ValueError("Really? more than 1 min of watering of a single plant - check your data!")
+            try:
+                wait = next(x for x in sequence['body'] if x['kind'] == 'wait')
+                if wait['args']['milliseconds']!=ms:
+                    wait['args']['milliseconds'] = ms
+                    self.log('Updating "{}" with {}ms and syncing ...'.format(sequence['name'],ms))
+                    self.put("sequences/{}".format(sequence['id']), sequence)
+                    self.sync()
+            except:
+                raise ValueError("Update of watering sequence failed")
+
+            #record watering amount into the meta
+            if today_s not in watering: watering[today_s]=ml
+            else: watering[today_s]+=ml
+            p['meta']['intelligent_watering']=watering.items()
+            return True
+
+        return False
 
     # ------------------------------------------------------------------------------------------------------------------
     def to_str(self, p):
@@ -252,16 +273,22 @@ class MLH(Farmware):
 
         # iterate over all eligible points
         for plant in points:
-            need_update = False
-            message = 'Plant: ({:4d},{:4d}) {:15s} - {:s}'.format(plant['x'], plant['y'], plant['name'],self.to_str(plant))
-            if not intel_watering or plant['plant_stage']=='planted':
-                self.execute_sequence(self.args['s']['before'], 'BEFORE: ')
-                if self.args['s']['before']!=None or self.args['s']['after']!=None:
+            need_update=False
+            message = 'Plant: ({:4d},{:4d}) {:10s} - {:s}'.format(plant['x'], plant['y'], plant['name'],self.to_str(plant))
+
+            if intel_watering:
+                if not self.intelligent_watering(self.args['s']['after'], plant, weather):
+                    self.log('SKIPPED: ' + message)
+                    continue
+                else: need_update=True
+
+            self.execute_sequence(self.args['s']['before'], 'BEFORE: ')
+
+            if self.args['s']['before']!=None or self.args['s']['after']!=None:
                     self.move_absolute({'x': plant['x'], 'y': plant['y'], 'z': self.args['default_z']})
-                if intel_watering:
-                    if self.intelligent_watering(self.args['s']['after'], plant, weather): need_update=True
-                self.execute_sequence(self.args['s']['after'], 'AFTER: ')
-            else: message='SKIPPED-AS-NON-PLANTED: '+message
+
+            self.execute_sequence(self.args['s']['after'], 'AFTER: ')
+
             if self.update_meta(plant): need_update=True
 
             if need_update:
