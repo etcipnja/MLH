@@ -42,7 +42,7 @@ class MLH(Farmware):
         self.log(str(self.args))
 
     #------------------------------------------------------------------------------------------------------------------
-    def utc_to_local(utc_dt):
+    def utc_to_local(self, utc_dt):
         # get integer timestamp to avoid precision lost
         timestamp = calendar.timegm(utc_dt.timetuple())
         local_dt = datetime.fromtimestamp(timestamp)
@@ -52,8 +52,7 @@ class MLH(Farmware):
     # Converts UTC date represented by a string into local date represented by a string
     def u2l(self, utc_s):
         d = datetime.datetime.strptime(utc_s, "%Y-%m-%dT%H:%M:%S.%fZ")
-        d = d.replace(tzinfo=tz.tzutc())
-        d = d.astimezone(tz.tzlocal())
+        d=self.utc_to_local(d)
         local_s = d.strftime("%B %d, %Y")
         return local_s
 
