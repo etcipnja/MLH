@@ -1,7 +1,7 @@
 import os
 import ast
 import datetime
-#from dateutil import tz
+import pytz
 import sys
 import requests
 from Farmware import Farmware
@@ -44,7 +44,7 @@ class MLH(Farmware):
     # Converts UTC date represented by a string into local date represented by a string
     def u2l(self, utc_s):
         d = datetime.datetime.strptime(utc_s, "%Y-%m-%dT%H:%M:%S.%fZ")
-        d = d.replace(tzinfo=tz.tzutc())
+        d = d.replace(tzinfo=pytz.utc)
         d = d.astimezone(tz.tzlocal())
         local_s = d.strftime("%B %d, %Y")
         return local_s
