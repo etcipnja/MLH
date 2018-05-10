@@ -1,10 +1,11 @@
 import os
 import ast
 import datetime
-from dateutil.tz import *
 import sys
 import requests
 from Farmware import Farmware
+import calendar
+
 
 class MLH(Farmware):
     def __init__(self):
@@ -40,10 +41,16 @@ class MLH(Farmware):
 
         self.log(str(self.args))
 
+    #------------------------------------------------------------------------------------------------------------------
+    def utc_to_local(utc_dt):
+        # get integer timestamp to avoid precision lost
+        timestamp = calendar.timegm(utc_dt.timetuple())
+        local_dt = datetime.fromtimestamp(timestamp)
+        assert utc_dt.resolution >= timedelta(microseconds=1)
+        return local_dt.replace(microsecond=utc_dt.microsecond)
     # ------------------------------------------------------------------------------------------------------------------
     # Converts UTC date represented by a string into local date represented by a string
     def u2l(self, utc_s):
-        w=datetime.now(tzlocal())
         d = datetime.datetime.strptime(utc_s, "%Y-%m-%dT%H:%M:%S.%fZ")
         d = d.replace(tzinfo=tz.tzutc())
         d = d.astimezone(tz.tzlocal())
