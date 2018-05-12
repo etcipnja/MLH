@@ -3,19 +3,9 @@ import ast
 import datetime
 import sys
 import requests
-from Farmware import Farmware
-import time
+from Farmware import *
 
-#timezone
-tz=0
-# long date representation to date object
-def l2d(long_s): return datetime.datetime.strptime(long_s, "%Y-%m-%dT%H:%M:%S.%fZ")
-def s2d(short_s): return datetime.datetime.strptime(short_s, "%Y-%m-%d")
-# date object to long date representation
-def d2l(date): return date.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
-def d2s(date): return date.strftime("%Y-%m-%d")
-# retrun today in UTC
-def today_utc(): return datetime.datetime.utcnow()
+
 # inverses boolean expr basing on variable
 def invb(inverse, expr):
     if not inverse: return expr
@@ -32,11 +22,11 @@ class MLH(Farmware):
         prefix = self.app_name.lower().replace('-', '_')
         self.args = {}
         self.args['s']={}
-        self.args['pointname']     = os.environ.get(prefix + "_pointname", '*')
+        self.args['pointname']     = os.environ.get(prefix + "_pointname", 'Eggplant,Basil')
         self.args['default_z']     = int(os.environ.get(prefix + "_default_z", -300))
         self.args['action']        = os.environ.get(prefix + "_action", 'test')
         self.args['filter_meta']   = os.environ.get(prefix + "_filter_meta", "None")
-        self.args['save_meta']     = os.environ.get(prefix + "_save_meta", "[('intelligent_watering','setup')]")
+        self.args['save_meta']     = os.environ.get(prefix + "_save_meta", "[('planted_at','2018-04-28')]")
         self.args['s']['init']     = os.environ.get(prefix + '_init', 'None')
         self.args['s']['before']   = os.environ.get(prefix + '_before', 'None')
         self.args['s']['after']    = os.environ.get(prefix + '_after', 'Water [MLH]')
@@ -162,7 +152,9 @@ class MLH(Farmware):
                           'Beets':      [50, 50, 50, 50, 50,    50,  50, 50],
                           'Zucchini':   [50, 50, 50, 450, 400, 400, 400, 400],
                           'Cabbage':    [50, 50, 50, 100, 400, 400, 400, 400],
-                          'Parsley':    [50, 50, 50, 400, 400, 400, 400, 400]
+                          'Parsley':    [50, 50, 50, 400, 400, 400, 400, 400],
+                          'Basil':      [50, 50, 50, 400, 400, 400, 400, 400],
+                          'Eggplant':   [50, 50, 50, 400, 400, 400, 400, 400]
                           }
 
         if p['planted_at'] != None:
@@ -177,7 +169,7 @@ class MLH(Farmware):
         watering_days = {}
         try:
             for i in range(0, 3):
-                if (age - i > 0):
+                if (age - i >= 0):
                     supposed_watering_3 += watering_needs[p['name']][(age - i) / 7]
         except:
             raise ValueError('There is no watering plan for {} for week {}, aborting'.format(p['name'], (age - i) / 7))
@@ -331,52 +323,12 @@ class MLH(Farmware):
         self.execute_sequence(self.args['s']['end'], "END: ")
 
 
-# ------------------------------------------------------------------------------------------------------------------
-    def scan(self, tr=(180,130), bl=(2650,1050), max_d=(150,150), scale=0.93, z=0):
-
-        image = (480, 640)
-        real = (int(image[0] * scale), int(image[1] * scale))
-
-        '''
-        images=self.get('images')
-        for i in images:
-            self.delete('images/{}'.format(i['id']))
-            time.sleep(1)
-        '''
-        #photo = next(x for x in self.get('sequences') if x['name'] == 'take a photo')
-        photo=None
-        #self.debug=True
-
-        steps=[0,0]
-        delta=[0,0]
-        steps[0]=int((bl[0]-tr[0])/max_d[0])
-        steps[1] = int((bl[1] - tr[1])/ max_d[1])
-        delta[0] =int((bl[0]-tr[0])/steps[0])
-        delta[1] = int((bl[1] - tr[1]) / steps[1])
-
-        x=tr[0]
-        y=tr[1]
-
-        j=0
-        while j<steps[1]:
-            i=0
-            x = tr[0]
-            while i<steps[0]:
-                self.move_absolute({'x': x, 'y': y, 'z': z})
-                self.execute_sequence(photo)
-                x += delta[0]
-                i+=1
-            y += delta[1]
-            j += 1
-
-
 # ----------------------------------------------------------------------------------------------------------------------
 if __name__ == "__main__":
 
     app = MLH()
     try:
         app.load_config()
-        #app.scan()
         app.run()
         sys.exit(0)
 
