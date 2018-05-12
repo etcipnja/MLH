@@ -45,7 +45,7 @@ class Farmware:
         if not self.debug:
             response = requests.delete(self.api_url + enpoint, headers=self.headers)
             response.raise_for_status()
-            return response.json()
+            return
     # ------------------------------------------------------------------------------------------------------------------
     def post(self, enpoint, data):
         if not self.debug:

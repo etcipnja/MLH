@@ -4,6 +4,22 @@ import datetime
 import sys
 import requests
 from Farmware import Farmware
+import time
+
+#timezone
+tz=0
+# long date representation to date object
+def l2d(long_s): return datetime.datetime.strptime(long_s, "%Y-%m-%dT%H:%M:%S.%fZ")
+def s2d(short_s): return datetime.datetime.strptime(short_s, "%Y-%m-%d")
+# date object to long date representation
+def d2l(date): return date.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+def d2s(date): return date.strftime("%Y-%m-%d")
+# retrun today in UTC
+def today_utc(): return datetime.datetime.utcnow()
+# inverses boolean expr basing on variable
+def invb(inverse, expr):
+    if not inverse: return expr
+    else: return not expr
 
 
 class MLH(Farmware):
@@ -16,10 +32,10 @@ class MLH(Farmware):
         prefix = self.app_name.lower().replace('-', '_')
         self.args = {}
         self.args['s']={}
-        self.args['pointname']     = os.environ.get(prefix + "_pointname", 'Beets')
+        self.args['pointname']     = os.environ.get(prefix + "_pointname", '*')
         self.args['default_z']     = int(os.environ.get(prefix + "_default_z", -300))
         self.args['action']        = os.environ.get(prefix + "_action", 'test')
-        self.args['filter_meta']   = os.environ.get(prefix + "_filter_meta", 'None')
+        self.args['filter_meta']   = os.environ.get(prefix + "_filter_meta", "None")
         self.args['save_meta']     = os.environ.get(prefix + "_save_meta", "[('intelligent_watering','setup')]")
         self.args['s']['init']     = os.environ.get(prefix + '_init', 'None')
         self.args['s']['before']   = os.environ.get(prefix + '_before', 'None')
@@ -27,7 +43,8 @@ class MLH(Farmware):
         self.args['s']['end']      = os.environ.get(prefix + '_end', 'None')
 
         try:
-            self.args['pointname']=self.args['pointname'].lower().replace(' ', '').split(',')
+            self.args['pointname']=self.args['pointname'].lower().split(',')
+            for x in self.args['pointname']: x=x.replace(' ', '')
             self.args['filter_meta'] = ast.literal_eval(self.args['filter_meta'])
             self.args['save_meta'] = ast.literal_eval(self.args['save_meta'])
 
@@ -37,36 +54,11 @@ class MLH(Farmware):
                 raise ValueError
         except:
             raise ValueError("Invalid meta {} or {}".format(self.args['filter_meta'], self.args['save_meta']))
-
+        global tz
         self.device=self.get('device')
+        tz=self.device['tz_offset_hrs']
 
         self.log(str(self.args))
-
-    # ------------------------------------------------------------------------------------------------------------------
-    # Converts UTC date represented by a string into local date represented by a string
-    def u2l(self, utc_s):
-        d = datetime.datetime.strptime(utc_s, "%Y-%m-%dT%H:%M:%S.%fZ")
-        d += datetime.timedelta(hours=self.device['tz_offset_hrs'])
-        local_s = d.strftime("%B %d, %Y")
-        return local_s
-
-    # ------------------------------------------------------------------------------------------------------------------
-    # Converts local date represented by a string into UTC date represented by a string
-    def l2u(self, local_s=''):
-        if local_s.lower()=='none': return None
-        if local_s!='':
-            d = datetime.datetime.strptime(local_s, "%B %d, %Y")
-        else:
-            d=datetime.date.today()
-        d -= datetime.timedelta(hours=self.device['tz_offset_hrs'])
-        local_s = d.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
-        return local_s
-
-    # ------------------------------------------------------------------------------------------------------------------
-    # inverses boolean expr basing on variable
-    def invb(self, inverse, expr):
-        if not inverse: return expr
-        else: return not expr
 
     # ------------------------------------------------------------------------------------------------------------------
     # returns true if point is matching filtering criteria
@@ -84,19 +76,19 @@ class MLH(Farmware):
                 if val[0] == '!':
                     inverse = True
                     val = val[1:]
-                if val.lower() == 'today': val = datetime.date.today().strftime("%B %d, %Y")
+                if val.lower() == 'today': val = d2s(today_utc())
 
                 if key == 'plant_stage':
-                    if not self.invb(inverse, p[key] == val): return False
+                    if not invb(inverse, p[key] == val): return False
                 elif key == 'planted_at':
                     if p['planted_at']==None:
-                        if not self.invb(inverse, val.lower()=='none'): return False
-                    dv=self.u2l(p['planted_at'])
-                    if not self.invb(inverse, dv == val): return False
+                        if not invb(inverse, val.lower()=='none'): return False
+                    dv=d2s(l2d(p['planted_at']))
+                    if not invb(inverse, dv == val): return False
                 else:
                     if key in p['meta']:
                         if val!='*':
-                            if not self.invb(inverse, p['meta'][key] == val): return False
+                            if not invb(inverse, p['meta'][key] == val): return False
                     else:
                         if not inverse: return False
 
@@ -111,7 +103,7 @@ class MLH(Farmware):
             for t in self.args['save_meta']:
                 key=t[0]
                 val = t[1]
-                if val.lower() == 'today': val = datetime.date.today().strftime("%B %d, %Y")
+                if val.lower() == 'today': val = d2s(today_utc())
 
                 # check for special values
                 if key =='intelligent_watering':
@@ -129,14 +121,14 @@ class MLH(Farmware):
                         if p[key]!=val:
                             p[key] = val
                             if val=='planned': p['planted_at']=None
-                            if val == 'planted': p['planted_at'] = self.l2u()
+                            if val == 'planted': p['planted_at'] = d2l(today_utc())
                             need_update = True
                     elif key == 'planted_at':
                         skip=False
                         if p['planted_at']!=None:
-                            if self.u2l(p['planted_at'])==val: skip=True
+                            if d2s(l2d(p['planted_at']))==val: skip=True
                         if not skip:
-                            p[key] = self.l2u(val)
+                            p[key] = d2l(s2d(val))
                             need_update = True
                     elif not (key in p['meta'] and p['meta'][key] == val):
                             p['meta'][key] = val
@@ -150,12 +142,18 @@ class MLH(Farmware):
 
         if p['plant_stage'] != 'planted': return False
 
-        today=datetime.date.today()
-        today_s=today.strftime("%B %d, %Y")
-
         # 1mm of rain is 1000ml of water over 1m2 or 10ml over 10x10sm (under the head)
+        rain_total_3=0
+        for key in weather:
+            d=s2d(key)
+            t=today_utc()
+            if (t-d).days<3:
+                rain_total_3+=weather[key]['rain24']
+
+
+
         rain_total_3=int(round(sum(weather[key]['rain24'] for key in weather.keys()
-                         if (datetime.date.today()-datetime.datetime.strptime(key, "%B %d, %Y").date()).days<3)*10))
+                         if (today_utc()-s2d(key)).days<3)*10))
 
         #getting supposed watering for 3 days
         # what I believe plants need every day in ml
@@ -168,8 +166,8 @@ class MLH(Farmware):
                           }
 
         if p['planted_at'] != None:
-            planted_at = datetime.datetime.strptime(p['planted_at'], "%Y-%m-%dT%H:%M:%S.%fZ").date()
-            age = (datetime.datetime.now().date() - planted_at).days
+            planted_at = l2d(p['planted_at'])
+            age = (today_utc() - planted_at).days
         else:
             age = 1
 
@@ -194,9 +192,9 @@ class MLH(Farmware):
             if 'intelligent_watering' not in p['meta']: p['meta']['intelligent_watering'] = '[]'
             watering_days=dict(map(lambda x: x, ast.literal_eval(p['meta']['intelligent_watering'])))
             watering_days = {k: v for (k, v) in watering_days.items()
-                        if today - datetime.datetime.strptime(k, "%B %d, %Y").date() < datetime.timedelta(days=7)}
+                        if today_utc() - s2d(k) < datetime.timedelta(days=7)}
             actual_watering_3=sum(watering_days[k] for k in watering_days.keys()
-                        if today-datetime.datetime.strptime(k, "%B %d, %Y").date() <datetime.timedelta(days=3))
+                        if today_utc() - s2d(k) <datetime.timedelta(days=3))
 
             # 1 sec or watering is 80ml (in my case)
             ml=int(round(supposed_watering_3-actual_watering_3-rain_total_3))
@@ -221,8 +219,9 @@ class MLH(Farmware):
                     raise ValueError("Update of watering sequence failed")
 
             #record watering amount into the meta
-            if today_s not in watering_days: watering_days[today_s]=ml
-            else: watering_days[today_s]+=ml
+            today_ls=d2s(today_utc())
+            if today_ls not in watering_days: watering_days[today_ls]=ml
+            else: watering_days[today_ls]+=ml
             p['meta']['intelligent_watering']=watering_days.items()
 
             if setup: ml=watering_needs[p['name']][age/7]
@@ -238,7 +237,7 @@ class MLH(Farmware):
     def to_str(self, p):
         str = '{:s}'.format(p['plant_stage'])
         if p['planted_at'] != None:
-            str += '({:15s})'.format(self.u2l(p['planted_at']))
+            str += '({:15s})'.format(d2s(l2d(p['planted_at'])))
         str += ' {}'.format(p['meta'])
         return str
 
@@ -305,7 +304,7 @@ class MLH(Farmware):
         # iterate over all eligible points
         for plant in points:
             need_update=False
-            message = 'Plant: ({:4d},{:4d}) {:10s} - {:s}'.format(plant['x'], plant['y'], plant['name'],self.to_str(plant))
+            message = 'Plant: ({:4d},{:4d}) {:15s} - {:s}'.format(plant['x'], plant['y'], plant['name'],self.to_str(plant))
 
             if intel_watering:
                 if not self.intelligent_watering(self.args['s']['after'], plant, weather):
@@ -331,28 +330,44 @@ class MLH(Farmware):
         # execute end sequence
         self.execute_sequence(self.args['s']['end'], "END: ")
 
+
 # ------------------------------------------------------------------------------------------------------------------
-    def scan(self, tr=(0,0), bl=(2000,1200), steps=(250,250), z=0):
+    def scan(self, tr=(180,130), bl=(2650,1050), max_d=(150,150), scale=0.93, z=0):
 
-        photo = next(x for x in self.get('sequences') if x['name'] == 'take a photo')
-        photo = None
+        image = (480, 640)
+        real = (int(image[0] * scale), int(image[1] * scale))
 
-        self.move_absolute({'x': tr[0], 'y': tr[1], 'z': z})
+        '''
+        images=self.get('images')
+        for i in images:
+            self.delete('images/{}'.format(i['id']))
+            time.sleep(1)
+        '''
+        #photo = next(x for x in self.get('sequences') if x['name'] == 'take a photo')
+        photo=None
+        #self.debug=True
 
-        x=0
-        y=0
-        while x<bl[0]:
-            while y<bl[1]:
+        steps=[0,0]
+        delta=[0,0]
+        steps[0]=int((bl[0]-tr[0])/max_d[0])
+        steps[1] = int((bl[1] - tr[1])/ max_d[1])
+        delta[0] =int((bl[0]-tr[0])/steps[0])
+        delta[1] = int((bl[1] - tr[1]) / steps[1])
+
+        x=tr[0]
+        y=tr[1]
+
+        j=0
+        while j<steps[1]:
+            i=0
+            x = tr[0]
+            while i<steps[0]:
+                self.move_absolute({'x': x, 'y': y, 'z': z})
                 self.execute_sequence(photo)
-                y+=steps[1]
-                self.move_absolute({'x':x,'y':y,'z':z})
-            x += steps[0]
-            if x >= 2000: break
-            while y>=0:
-                self.execute_sequence(photo)
-                self.move_absolute({'x':x,'y':y,'z':z})
-                y -= steps[1]
-            x += steps[0]
+                x += delta[0]
+                i+=1
+            y += delta[1]
+            j += 1
 
 
 # ----------------------------------------------------------------------------------------------------------------------
