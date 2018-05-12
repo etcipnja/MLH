@@ -22,19 +22,19 @@ class MLH(Farmware):
         prefix = self.app_name.lower().replace('-', '_')
         self.args = {}
         self.args['s']={}
-        self.args['pointname']     = os.environ.get(prefix + "_pointname", 'Eggplant,Basil')
+        self.args['pointname']     = os.environ.get(prefix + "_pointname", 'Eggplant, Basil')
         self.args['default_z']     = int(os.environ.get(prefix + "_default_z", -300))
         self.args['action']        = os.environ.get(prefix + "_action", 'test')
         self.args['filter_meta']   = os.environ.get(prefix + "_filter_meta", "None")
-        self.args['save_meta']     = os.environ.get(prefix + "_save_meta", "[('planted_at','2018-04-28')]")
+        self.args['save_meta']     = os.environ.get(prefix + "_save_meta", "None")
         self.args['s']['init']     = os.environ.get(prefix + '_init', 'None')
         self.args['s']['before']   = os.environ.get(prefix + '_before', 'None')
-        self.args['s']['after']    = os.environ.get(prefix + '_after', 'Water [MLH]')
+        self.args['s']['after']    = os.environ.get(prefix + '_after', 'None')
         self.args['s']['end']      = os.environ.get(prefix + '_end', 'None')
 
         try:
             self.args['pointname']=self.args['pointname'].lower().split(',')
-            for x in self.args['pointname']: x=x.replace(' ', '')
+            self.args['pointname'] = [x.strip(' ') for x in self.args['pointname']]
             self.args['filter_meta'] = ast.literal_eval(self.args['filter_meta'])
             self.args['save_meta'] = ast.literal_eval(self.args['save_meta'])
 
