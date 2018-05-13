@@ -22,14 +22,14 @@ class MLH(Farmware):
         prefix = self.app_name.lower().replace('-', '_')
         self.args = {}
         self.args['s']={}
-        self.args['pointname']     = os.environ.get(prefix + "_pointname", 'Eggplant, Basil')
+        self.args['pointname']     = os.environ.get(prefix + "_pointname", '*')
         self.args['default_z']     = int(os.environ.get(prefix + "_default_z", -300))
         self.args['action']        = os.environ.get(prefix + "_action", 'test')
         self.args['filter_meta']   = os.environ.get(prefix + "_filter_meta", "None")
         self.args['save_meta']     = os.environ.get(prefix + "_save_meta", "None")
         self.args['s']['init']     = os.environ.get(prefix + '_init', 'None')
         self.args['s']['before']   = os.environ.get(prefix + '_before', 'None')
-        self.args['s']['after']    = os.environ.get(prefix + '_after', 'None')
+        self.args['s']['after']    = os.environ.get(prefix + '_after', 'Water [MLH]')
         self.args['s']['end']      = os.environ.get(prefix + '_end', 'None')
 
         try:
@@ -132,29 +132,16 @@ class MLH(Farmware):
 
         if p['plant_stage'] != 'planted': return False
 
-        # 1mm of rain is 1000ml of water over 1m2 or 10ml over 10x10sm (under the head)
-        rain_total_3=0
-        for key in weather:
-            d=s2d(key)
-            t=today_utc()
-            if (t-d).days<3:
-                rain_total_3+=weather[key]['rain24']
-
-
-
-        rain_total_3=int(round(sum(weather[key]['rain24'] for key in weather.keys()
-                         if (today_utc()-s2d(key)).days<3)*10))
-
-        #getting supposed watering for 3 days
         # what I believe plants need every day in ml
         #                Name            W1  W2  W3  W4   W5   W6   W7    W8
-        watering_needs = {'Carrot':     [50, 50, 50, 50, 50,    50,  50, 50],
-                          'Beets':      [50, 50, 50, 50, 50,    50,  50, 50],
-                          'Zucchini':   [50, 50, 50, 450, 400, 400, 400, 400],
-                          'Cabbage':    [50, 50, 50, 100, 400, 400, 400, 400],
-                          'Parsley':    [50, 50, 50, 400, 400, 400, 400, 400],
-                          'Basil':      [50, 50, 50, 400, 400, 400, 400, 400],
-                          'Eggplant':   [50, 50, 50, 400, 400, 400, 400, 400]
+        watering_needs = {'carrot':     [  50,   50,   50,   50,   50,   50,   50,  50],
+                          'beets':      [  50,   50,   50,   50,   50,   50,   50,  50],
+                          'zucchini':   [  50,   50,   50,  450,  400,  400,  400,  400],
+                          'cabbage':    [  50,   50,   50,  100,  400,  400,  400,  400],
+                          'parsley':    [  50,   50,   50,  400,  400,  400,  400,  400],
+                          'basil':      [  50,   50,   50,  400,  400,  400,  400,  400],
+                          'eggplant':   [  50,   50,   50,  400,  400,  400,  400,  400],
+                          'side garden':[3600, 3600, 3600, 3600, 3600, 3600, 3600, 3600]
                           }
 
         if p['planted_at'] != None:
@@ -170,7 +157,7 @@ class MLH(Farmware):
         try:
             for i in range(0, 3):
                 if (age - i >= 0):
-                    supposed_watering_3 += watering_needs[p['name']][(age - i) / 7]
+                    supposed_watering_3 += watering_needs[p['name'].lower()][(age - i) / 7]
         except:
             raise ValueError('There is no watering plan for {} for week {}, aborting'.format(p['name'], (age - i) / 7))
 
@@ -189,11 +176,11 @@ class MLH(Farmware):
                         if today_utc() - s2d(k) <datetime.timedelta(days=3))
 
             # 1 sec or watering is 80ml (in my case)
-            ml=int(round(supposed_watering_3-actual_watering_3-rain_total_3))
+            ml=int(round(supposed_watering_3-actual_watering_3-self.rain_total_3))
 
         if ml<0: ml=0
         ms = int(ml / 80.0 * 1000)
-        if setup: ms=int(watering_needs[p['name']][age/7]/ 80.0 * 1000)
+        if setup: ms=int(watering_needs[p['name'].lower()][age/7]/ 80.0 * 1000)
 
         if ml>10:
 
@@ -216,20 +203,22 @@ class MLH(Farmware):
             else: watering_days[today_ls]+=ml
             p['meta']['intelligent_watering']=watering_days.items()
 
-            if setup: ml=watering_needs[p['name']][age/7]
+            if setup: ml=watering_needs[p['name'].lower()][age/7]
             if sequence != None:
-                self.log("Plant {} of age {}d last 3d watering was {}+{}/{}ml -> watering for {}ml({}ms)".
-                     format(p['name'], age, actual_watering_3, rain_total_3, supposed_watering_3, ml, ms))
+                self.log("{} of age {}d last 3d watering was {}+{}/{}ml -> watering for {}ml({}ms)".
+                     format(p['name'], age, actual_watering_3, self.rain_total_3, supposed_watering_3, ml, ms))
 
             return True
 
+        self.log("{} of age {}d last 3d watering was {}+{}/{}ml -> watering CANCELLED".
+                 format(p['name'], age, actual_watering_3, self.rain_total_3, supposed_watering_3))
         return False
 
     # ------------------------------------------------------------------------------------------------------------------
     def to_str(self, p):
         str = '{:s}'.format(p['plant_stage'])
         if p['planted_at'] != None:
-            str += '({:15s})'.format(d2s(l2d(p['planted_at'])))
+            str += '({:s})'.format(d2s(l2d(p['planted_at'])))
         str += ' {}'.format(p['meta'])
         return str
 
@@ -240,6 +229,12 @@ class MLH(Farmware):
             weather = ast.literal_eval(wf.read())
             if not isinstance(weather, dict): raise ValueError
             self.log('Weather readings {}'.format(weather))
+
+            self.rain_total_3 = int(round(sum(weather[key]['rain24'] for key in weather.keys()
+                                         if (today_utc() - s2d(key)).days < 3) * 10))
+
+            # 1mm of rain is 1000ml of water over 1m2 or 10ml over 10x10sm (under the head)
+            self.log('Total rain for last 3 days {}ml over 10x10sm'.format(self.rain_total_3))
         except Exception as e:
             weather = {}
             self.log('No weather information availabe, install Netatmo farmware and run it before this', 'warn')
@@ -267,6 +262,8 @@ class MLH(Farmware):
         #processing sequences
         all_s = self.get('sequences')
         try:
+            if self.args['s']['after'].lower()!='none': self.args['s']['side']='Water [MLH] Side Garden'
+            else: self.args['s']['side']='None'
             for k in self.args['s']:
                 if self.args['s'][k].lower()== 'none': self.args['s'][k]=None
                 else: self.args['s'][k]=next(i for i in all_s if i['name'].lower() == self.args['s'][k].lower())
@@ -276,7 +273,7 @@ class MLH(Farmware):
         #check if we need to enable intelligent watering
         intel_watering=False
         if self.args['save_meta']!=None and ('intelligent_watering', 'setup') in self.args['save_meta']:
-            self.log("Setting up intellignet watering, will make record that you watered last 3 days per schedule",'warn')
+            self.log("Setting up intellignet watering, will make a record that you watered last 3 days per schedule",'warn')
             intel_watering = True
         if self.args['s']['after'] != None:
             if 'water' in self.args['s']['after']['name'].lower() and '[mlh]' in self.args['s']['after']['name'].lower():
@@ -298,18 +295,20 @@ class MLH(Farmware):
             need_update=False
             message = 'Plant: ({:4d},{:4d}) {:15s} - {:s}'.format(plant['x'], plant['y'], plant['name'],self.to_str(plant))
 
+            sq = self.args['s']['after']
             if intel_watering:
-                if not self.intelligent_watering(self.args['s']['after'], plant, weather):
-                    self.log('SKIPPED: ' + message)
-                    continue
-                else: need_update=True
+                if plant['name'].lower() == 'side garden': sq=self.args['s']['side']
+                if self.intelligent_watering(sq, plant, weather):
+                    need_update=True
 
-            self.execute_sequence(self.args['s']['before'], 'BEFORE: ')
+            if not intel_watering or need_update:
+                self.execute_sequence(self.args['s']['before'], 'BEFORE: ')
 
-            if self.args['s']['before']!=None or self.args['s']['after']!=None:
-                    self.move_absolute({'x': plant['x'], 'y': plant['y'], 'z': self.args['default_z']})
+                if self.args['s']['before']!=None or self.args['s']['after']!=None:
+                        if plant['name'].lower()!='side garden':
+                            self.move_absolute({'x': plant['x'], 'y': plant['y'], 'z': self.args['default_z']})
 
-            self.execute_sequence(self.args['s']['after'], 'AFTER: ')
+                self.execute_sequence(sq, 'AFTER: ')
 
             if self.update_meta(plant): need_update=True
 
