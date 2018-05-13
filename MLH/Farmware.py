@@ -2,6 +2,7 @@ import os
 import json
 import requests
 import datetime
+import time
 
 #timezone
 tz=0
@@ -29,14 +30,13 @@ class Farmware:
     # ------------------------------------------------------------------------------------------------------------------
     def log(self, message, message_type='info'):
 
-        if not self.debug:
-            try:
-                log_message = '[{}] {}'.format(self.app_name, message)
-                node = {'kind': 'send_message', 'args': {'message': log_message, 'message_type': message_type}}
-                response = requests.post(os.environ['FARMWARE_URL'] + 'api/v1/celery_script', data=json.dumps(node),headers=self.headers)
-                response.raise_for_status()
-                message = log_message
-            except: pass
+        try:
+            log_message = '[{}] {}'.format(self.app_name, message)
+            node = {'kind': 'send_message', 'args': {'message': log_message, 'message_type': message_type}}
+            response = requests.post(os.environ['FARMWARE_URL'] + 'api/v1/celery_script', data=json.dumps(node),headers=self.headers)
+            response.raise_for_status()
+            message = log_message
+        except: pass
 
         print(message)
 
