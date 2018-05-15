@@ -22,14 +22,14 @@ class MLH(Farmware):
         prefix = self.app_name.lower().replace('-', '_')
         self.args = {}
         self.args['s']={}
-        self.args['pointname']     = os.environ.get(prefix + "_pointname", '*')
+        self.args['pointname']     = os.environ.get(prefix + "_pointname", 'Beets')
         self.args['default_z']     = int(os.environ.get(prefix + "_default_z", -300))
-        self.args['action']        = os.environ.get(prefix + "_action", 'test')
+        self.args['action']        = os.environ.get(prefix + "_action", 'real')
         self.args['filter_meta']   = os.environ.get(prefix + "_filter_meta", "None")
-        self.args['save_meta']     = os.environ.get(prefix + "_save_meta", "None")
+        self.args['save_meta']     = os.environ.get(prefix + "_save_meta", "[('del','last_watering')]")
         self.args['s']['init']     = os.environ.get(prefix + '_init', 'None')
         self.args['s']['before']   = os.environ.get(prefix + '_before', 'None')
-        self.args['s']['after']    = os.environ.get(prefix + '_after', 'Water [MLH]')
+        self.args['s']['after']    = os.environ.get(prefix + '_after', 'None')
         self.args['s']['end']      = os.environ.get(prefix + '_end', 'None')
 
         try:
@@ -203,15 +203,15 @@ class MLH(Farmware):
             else: watering_days[today_ls]+=ml
             p['meta']['intelligent_watering']=watering_days.items()
 
-            if setup: ml=watering_needs[p['name'].lower()][age/7]
+            if setup: ml=watering_needs[p['name'].lower()][int(age/7)]
             if sequence != None:
-                self.log("{} of age {}d last 3d watering was {}+{}/{}ml -> watering for {}ml({}ms)".
-                     format(p['name'], age, actual_watering_3, self.rain_total_3, supposed_watering_3, ml, ms))
+                self.log("{} of age {}w last 3d watering was {}+{}/{}ml -> watering for {}ml({}ms)".
+                     format(p['name'], int(age/7), actual_watering_3, self.rain_total_3, supposed_watering_3, ml, ms))
 
             return True
 
-        self.log("{} of age {}d last 3d watering was {}+{}/{}ml -> watering CANCELLED".
-                 format(p['name'], age, actual_watering_3, self.rain_total_3, supposed_watering_3))
+        self.log("{} of age {}w last 3d watering was {}+{}/{}ml -> watering CANCELLED".
+                 format(p['name'], int(age/7), actual_watering_3, self.rain_total_3, supposed_watering_3))
         return False
 
     # ------------------------------------------------------------------------------------------------------------------
@@ -262,8 +262,6 @@ class MLH(Farmware):
         #processing sequences
         all_s = self.get('sequences')
         try:
-            if self.args['s']['after'].lower()!='none': self.args['s']['side']='Water [MLH] Side Garden'
-            else: self.args['s']['side']='None'
             for k in self.args['s']:
                 if self.args['s'][k].lower()== 'none': self.args['s'][k]=None
                 else: self.args['s'][k]=next(i for i in all_s if i['name'].lower() == self.args['s'][k].lower())
@@ -283,9 +281,12 @@ class MLH(Farmware):
                 if intel_watering:
                     raise ValueError('Your AFTER sequence is not compatible with intelligent watering'.format(self.args['s']['after']['name'].upper()))
 
+        self.args['s']['side'] = 'None'
         if intel_watering:
             self.log("Intelligent watering mode is engaged",'warn')
             weather=self.read_weather()
+            try: self.args['s']['side']=next(i for i in all_s if i['name'].lower() == 'Water [MLH] Side Garden'.lower())
+            except: pass
 
         # execute init sequence
         self.execute_sequence(self.args['s']['init'], 'INIT: ')
