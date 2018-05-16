@@ -131,9 +131,22 @@ class Farmware:
         self._tools = self.get('tools')
         return self._tools
 
+    # ------------------------------------------------------------------------------------------------------------------
+    def lookup_openfarm(self, plant):
+        response = requests.get(
+            'https://openfarm.cc/api/v1/crops?include=pictures&filter={}'.format(plant['openfarm_slug']), headers=self.headers)
+        response.raise_for_status()
+        return response.json()
 
     # ------------------------------------------------------------------------------------------------------------------
-    def load_weather(self):
+    def load_weather(self, force_query=False):
+
+        try:
+            if force_query:
+                read_weather = next(x for x in self.sequences() if x['name'].lower() == 'read weather')
+                self.execute_sequence(read_weather)
+        except:
+            raise ValueError("READ WEATHER sequence is not found. Consider installing Netatmo farmware and creating this sequence")
 
         self.weather = {}
         today = datetime.datetime.utcnow().strftime('%Y-%m-%d')
@@ -153,11 +166,19 @@ class Farmware:
             self.weather = {k: v for (k, v) in self.weather.items() if
                             datetime.date.today() - datetime.datetime.strptime(k,
                                                     '%Y-%m-%d').date() < datetime.timedelta(days=7)}
-            self.log('Historic weather: {}'.format(self.weather))
+
+            # 1mm of rain is 90ml over 30x30sm
+            self.weather['rain_3']=int(round(sum(self.weather[key]['rain24'] for key in self.weather.keys()
+                                              if (today_utc() - s2d(key)).days < 3)))
+            self.log('Rain last 3d is {}mm, historic weather: {}'.format(self.weather['rain_3'], self.weather))
+
+
         except: pass
 
         if today not in self.weather: self.weather[today] = {'max_temperature': None, 'min_temperature': None,
                                                              'rain24': None}
+
+
         return self.weather[today]
 
     # ------------------------------------------------------------------------------------------------------------------
