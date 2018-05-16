@@ -2,7 +2,7 @@ import os
 import json
 import requests
 import datetime
-import time
+import ast
 
 #timezone
 tz=0
@@ -19,6 +19,9 @@ def today_utc(): return datetime.datetime.utcnow()
 class Farmware:
     # ------------------------------------------------------------------------------------------------------------------
     def __init__(self,app_name):
+        self._points=None
+        self._sequences=None
+        self._tools=None
         self.debug=False
         self.app_name=app_name
         self.api_url = 'https://my.farmbot.io/api/'
@@ -110,4 +113,63 @@ class Farmware:
                                      headers=self.headers)
             response.raise_for_status()
 
+    # ------------------------------------------------------------------------------------------------------------------
+    def points(self):
+        if self._points!=None: return self._points
+        self._points=self.get('points')
+        return self._points
+
+    # ------------------------------------------------------------------------------------------------------------------
+    def sequences(self):
+        if self._sequences != None: return self._sequences
+        self._sequences = self.get('sequences')
+        return self._sequences
+
+    # ------------------------------------------------------------------------------------------------------------------
+    def tools(self):
+        if self._tools != None: return self._tools
+        self._tools = self.get('tools')
+        return self._tools
+
+
+    # ------------------------------------------------------------------------------------------------------------------
+    def load_weather(self):
+
+        self.weather = {}
+        today = datetime.datetime.utcnow().strftime('%Y-%m-%d')
+
+        try:
+            weather_station = None
+            try:
+                watering_tool = next(x for x in self.tools() if 'water' in x['name'].lower())
+                weather_station = next(x for x in self.points() if x['pointer_type'] == 'ToolSlot'
+                                       and x['tool_id'] == watering_tool['id'])
+            except Exception as e:
+                self.log("No watering tool detected (I save weather into the watering tool meta)")
+
+            self.weather = ast.literal_eval(weather_station['meta']['current_weather'])
+            if not isinstance(self.weather, dict): raise ValueError
+            # leave only last 7 days
+            self.weather = {k: v for (k, v) in self.weather.items() if
+                            datetime.date.today() - datetime.datetime.strptime(k,
+                                                    '%Y-%m-%d').date() < datetime.timedelta(days=7)}
+            self.log('Historic weather: {}'.format(self.weather))
+        except: pass
+
+        if today not in self.weather: self.weather[today] = {'max_temperature': None, 'min_temperature': None,
+                                                             'rain24': None}
+        return self.weather[today]
+
+    # ------------------------------------------------------------------------------------------------------------------
+    def save_weather(self):
+
+        weather_station = None
+        try:
+            watering_tool = next(x for x in self.tools() if 'water' in x['name'].lower())
+            weather_station = next(x for x in self.points() if x['pointer_type'] == 'ToolSlot'
+                                   and x['tool_id'] == watering_tool['id'])
+            weather_station['meta']['current_weather'] = str(self.weather)
+            self.post('points/{}'.format(weather_station['id']), weather_station)
+        except:
+            raise ValueError("No watering tool detected (I save weather into the watering tool meta)")
 

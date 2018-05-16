@@ -1,8 +1,4 @@
-import os
-import ast
-import datetime
 import sys
-import requests
 from Farmware import *
 
 
@@ -24,13 +20,13 @@ class MLH(Farmware):
         self.args['s']={}
         self.args['pointname']     = os.environ.get(prefix + "_pointname", 'Beets')
         self.args['default_z']     = int(os.environ.get(prefix + "_default_z", -300))
-        self.args['action']        = os.environ.get(prefix + "_action", 'real')
+        self.args['action']        = os.environ.get(prefix + "_action", 'test')
         self.args['filter_meta']   = os.environ.get(prefix + "_filter_meta", "None")
-        self.args['save_meta']     = os.environ.get(prefix + "_save_meta", "[('del','last_watering')]")
-        self.args['s']['init']     = os.environ.get(prefix + '_init', 'None')
-        self.args['s']['before']   = os.environ.get(prefix + '_before', 'None')
-        self.args['s']['after']    = os.environ.get(prefix + '_after', 'None')
-        self.args['s']['end']      = os.environ.get(prefix + '_end', 'None')
+        self.args['save_meta']     = os.environ.get(prefix + "_save_meta", "None")
+        self.args['s']['init']     = os.environ.get(prefix + '_init', 'FLASH LIGHT')
+        self.args['s']['before']   = os.environ.get(prefix + '_before', 'FLASH LIGHT')
+        self.args['s']['after']    = os.environ.get(prefix + '_after', 'FLASH LIGHT')
+        self.args['s']['end']      = os.environ.get(prefix + '_end', 'FLASH LIGHT')
 
         try:
             self.args['pointname']=self.args['pointname'].lower().split(',')
@@ -249,22 +245,19 @@ class MLH(Farmware):
             self.debug=True
 
         #processing points
-        points = self.get('points')
-        # filter points
-        points = [x for x in points if self.is_eligible_point(x)]
-        if len(points) == 0:
+        plants = [x for x in self.points() if self.is_eligible_point(x)]
+        if len(plants) == 0:
             self.log('No plants selected by the filter, aborting','warn')
             return
 
-        self.log('{} plants selected by the filter'.format(len(points)), 'success')
-        points = sorted(points, key=lambda elem: ( elem['name'], int(elem['x']), int(elem['y'])))
+        self.log('{} plants selected by the filter'.format(len(plants)), 'success')
+        plants = sorted(plants, key=lambda elem: ( elem['name'], int(elem['x']), int(elem['y'])))
 
         #processing sequences
-        all_s = self.get('sequences')
         try:
             for k in self.args['s']:
                 if self.args['s'][k].lower()== 'none': self.args['s'][k]=None
-                else: self.args['s'][k]=next(i for i in all_s if i['name'].lower() == self.args['s'][k].lower())
+                else: self.args['s'][k]=next(i for i in self.sequences() if i['name'].lower() == self.args['s'][k].lower())
         except:
             raise ValueError('Sequence not found: {}'.format(self.args['s'][k].upper()))
 
@@ -292,7 +285,7 @@ class MLH(Farmware):
         self.execute_sequence(self.args['s']['init'], 'INIT: ')
 
         # iterate over all eligible points
-        for plant in points:
+        for plant in plants:
             need_update=False
             message = 'Plant: ({:4d},{:4d}) {:15s} - {:s}'.format(plant['x'], plant['y'], plant['name'],self.to_str(plant))
 
