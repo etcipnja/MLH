@@ -5,9 +5,9 @@
  "description": "Mother's little helper to automate routine operations on multiple plants at once",
  "version": "2.3.0",
  "min_os_version_major": 6,
- "url": "https://raw.githubusercontent.com/etcipnja/MLH/master/MLH/manifest.json",
- "zip": "https://github.com/etcipnja/MLH/archive/master.zip",
- "executable": "python",
+ "url": "https://raw.githubusercontent.com/etcipnja/MLH/dev/MLH/manifest.json",
+ "zip": "https://github.com/etcipnja/MLH/archive/dev.zip",
+  "executable": "python",
  "args": ["MLH-master/MLH/main.py"],
  "config": [
   {"name": "pointname", "label": "Filter by plant name", "value": "*"},
