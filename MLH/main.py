@@ -11,7 +11,7 @@ def invb(inverse, expr):
 
 class MLH(Farmware):
     def __init__(self):
-        Farmware.__init__(self,((__file__.split(os.sep))[len(__file__.split(os.sep)) - 3]).replace('-master', ''))
+        Farmware.__init__(self,((__file__.split(os.sep))[len(__file__.split(os.sep)) - 3]).replace('-master', '').replace('-dev',''))
 
     # ------------------------------------------------------------------------------------------------------------------
     # loads config parameters
@@ -19,9 +19,9 @@ class MLH(Farmware):
         prefix = self.app_name.lower().replace('-', '_')
         self.args = {}
         self.args['s']={}
-        self.args['pointname']     = os.environ.get(prefix + "_pointname", '*')
+        self.args['pointname']     = os.environ.get(prefix + "_pointname", 'Beets')
         self.args['default_z']     = int(os.environ.get(prefix + "_default_z", -300))
-        self.args['action']        = os.environ.get(prefix + "_action", 'test')
+        self.args['action']        = os.environ.get(prefix + "_action", 'real')
         self.args['filter_meta']   = os.environ.get(prefix + "_filter_meta", "None")
         self.args['save_meta']     = os.environ.get(prefix + "_save_meta", "None")
         self.args['s']['init']     = os.environ.get(prefix + '_init', 'None')
