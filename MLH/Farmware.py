@@ -27,6 +27,11 @@ class Farmware:
         self.api_url = 'https://my.farmbot.io/api/'
         try:
             self.headers = {'Authorization': 'Bearer ' + os.environ['API_TOKEN'], 'content-type': "application/json"}
+
+            global tz
+            self.device = self.get('device')
+            tz = self.device['tz_offset_hrs']
+            tz=-4
         except :
             print("API_TOKEN is not set, you gonna have bad time")
 
@@ -139,17 +144,10 @@ class Farmware:
         return response.json()
 
     # ------------------------------------------------------------------------------------------------------------------
-    def load_weather(self, force_query=False):
-
-        try:
-            if force_query:
-                read_weather = next(x for x in self.sequences() if x['name'].lower() == 'read weather')
-                self.execute_sequence(read_weather)
-        except:
-            raise ValueError("READ WEATHER sequence is not found. Consider installing Netatmo farmware and creating this sequence")
+    def load_weather(self):
 
         self.weather = {}
-        today = datetime.datetime.utcnow().strftime('%Y-%m-%d')
+        today = (datetime.datetime.utcnow()+ datetime.timedelta(hours=tz)).strftime('%Y-%m-%d')
 
         try:
             weather_station = None
@@ -163,29 +161,23 @@ class Farmware:
             self.weather = ast.literal_eval(weather_station['meta']['current_weather'])
             if not isinstance(self.weather, dict): raise ValueError
             # leave only last 7 days
+            if 'rain_3' in self.weather.keys(): del self.weather['rain_3']
             self.weather = {k: v for (k, v) in self.weather.items() if
-                            datetime.date.today() - datetime.datetime.strptime(k,
-                                                    '%Y-%m-%d').date() < datetime.timedelta(days=7)}
+                            datetime.date.today() - s2d(k).date() < datetime.timedelta(days=7)}
 
             # 1mm of rain is 90ml over 30x30sm
             self.weather['rain_3']=int(round(sum(self.weather[key]['rain24'] for key in self.weather.keys()
                                               if (today_utc() - s2d(key)).days < 3)))
-            self.log('Rain last 3d is {}mm, historic weather: {}'.format(self.weather['rain_3'], self.weather))
+        except:  pass
 
-
-        except: pass
-
-        if today not in self.weather: self.weather[today] = {'max_temperature': None, 'min_temperature': None,
-                                                             'rain24': None}
-
-
-        return self.weather[today]
+        return today
 
     # ------------------------------------------------------------------------------------------------------------------
     def save_weather(self):
 
         weather_station = None
         try:
+            if 'rain_3' in self.weather.keys(): del self.weather['rain_3']
             watering_tool = next(x for x in self.tools() if 'water' in x['name'].lower())
             weather_station = next(x for x in self.points() if x['pointer_type'] == 'ToolSlot'
                                    and x['tool_id'] == watering_tool['id'])

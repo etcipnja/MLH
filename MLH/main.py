@@ -41,9 +41,6 @@ class MLH(Farmware):
                 raise ValueError
         except:
             raise ValueError("Invalid meta {} or {}".format(self.args['filter_meta'], self.args['save_meta']))
-        global tz
-        self.device=self.get('device')
-        tz=self.device['tz_offset_hrs']
 
         self.log(str(self.args))
 
@@ -176,7 +173,9 @@ class MLH(Farmware):
                         if today_utc() - s2d(k) <datetime.timedelta(days=3))
 
             # 1 sec or watering is 80ml (in my case)
-            rain_watering=int(2*math.pi*p['meta']['row_spacing']*self.weather['rain_3'])
+            rain_3=0
+            if 'rain_3' in self.weather: rain_3=self.weather['rain_3']
+            rain_watering=int(math.pi*p['meta']['row_spacing']**2*rain_3/1000)
             ml=int(round(supposed_watering_3-actual_watering_3-rain_watering))
 
         if ml<0: ml=0
@@ -262,7 +261,8 @@ class MLH(Farmware):
         self.args['s']['side'] = 'None'
         if intel_watering:
             self.log("Intelligent watering mode is engaged",'warn')
-            self.load_weather(True)
+            self.load_weather()
+            self.log('Weather: {}'.format(self.weather))
             try: self.args['s']['side']=next(i for i in all_s if i['name'].lower() == 'Water [MLH] Side Garden'.lower())
             except: pass
 
