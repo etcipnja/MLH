@@ -20,7 +20,7 @@ class MLH(Farmware):
         self.get_arg('pointname'    , "Lettuce, Romaine Lettuce")
         self.get_arg('default_z'    , -300)
         self.get_arg('filter_meta'  , "None")
-        self.get_arg('save_meta'    , "[('intelligent_watering','setup')]")
+        self.get_arg('save_meta'    , "[('iwatering','setup')]")
         self.get_arg('init'         , "None")
         self.get_arg('before'       , "None")
         self.get_arg('after'        , "Water [MLH]")
@@ -87,7 +87,7 @@ class MLH(Farmware):
                 if val.lower() == 'today': val = d2s(today_local())
 
                 # check for special values
-                if key =='intelligent_watering':
+                if key =='iwatering':
                     continue
                 if key == 'del':
                     if val == '*' and p['meta'] != {}:
@@ -119,7 +119,7 @@ class MLH(Farmware):
 
     # ------------------------------------------------------------------------------------------------------------------
     #updates the watering sequence and meta. Returns True if waterign is needed
-    def intelligent_watering(self, sequence, p, skip):
+    def iwatering(self, sequence, p, skip):
 
         if p['plant_stage'] != 'planted': return False
         today_ls = d2s(today_local())
@@ -143,29 +143,29 @@ class MLH(Farmware):
         age = 0
         if p['planted_at'] != None:  age = (today_utc() - l2d(p['planted_at'])).days
 
-        #supposed watering
+        #calculating supposed watering for today
         try: supposed_watering = watering_needs[p['name'].lower()][int(age / 7)]
         except: raise ValueError('There is no plan for {} for week {}, aborting'.format(p['name'], int(age / 7)))
 
-        # are we in setup?
+        # are we in iWatering setup?
         setup = False
-        if self.args['save_meta'] != None and ('intelligent_watering', 'setup') in self.args['save_meta']:
-            p['meta']['intelligent_watering'] = '{}'
+        if self.args['save_meta'] != None and ('iwatering', 'setup') in self.args['save_meta']:
+            p['meta']['iwatering'] = '{}'
             setup = True
             ml = supposed_watering
 
-        #actual_watering
+        #calculating actual_watering today
         actual_watering=0
         watering_days={}
-        if 'intelligent_watering' in p['meta']:
-            watering_days=ast.literal_eval(p['meta']['intelligent_watering'])
+        if 'iwatering' in p['meta']:
+            watering_days=ast.literal_eval(p['meta']['iwatering'])
         if today_ls in watering_days:
             actual_watering = watering_days[today_ls]
         else: watering_days[today_ls]=0
 
-        #what to water
+        #how much to water in ml
         ml = int(round(supposed_watering - actual_watering)) if supposed_watering>actual_watering else 0
-        ms = int(ml / 80.0 * 1000)
+        ms = int(ml / 80.0 * 1000)  #in my case watering nozzle produce 80ml in a sec
 
         save = False
         if ml>0:
@@ -185,7 +185,7 @@ class MLH(Farmware):
             #record watering amount into the meta
             if not skip or setup:
                 watering_days[today_ls]+=ml
-                p['meta']['intelligent_watering']=str(watering_days)
+                p['meta']['iwatering']=str(watering_days)
                 save=True
 
             if sequence != None and not skip:
@@ -205,25 +205,38 @@ class MLH(Farmware):
         return str
 
     # ------------------------------------------------------------------------------------------------------------------
-    def is_intellingent_watering(self):
+    # returns True if iWatering shall be enabled
+    def is_iwatering(self):
 
-        intel_watering = False
         setup=False
-        if self.args['save_meta'] != None and ('intelligent_watering', 'setup') in self.args['save_meta']:
-            self.log("Setting up intellignet watering, will make a record that you watered per schedule", 'warn')
+        iwatering = False
+        hassequence=False
+        if self.args['save_meta'] != None and ('iwatering', 'setup') in self.args['save_meta']:
             setup=True
-            intel_watering = True
+            iwatering = True
         if self.args['after'] != None:
             if 'water' in self.args['after']['name'].lower() and '[mlh]' in self.args['after']['name'].lower():
-                if intel_watering: self.log("Sequence provided - will try actual watering as well", 'warn')
-                intel_watering = True
+                if setup: hassequence=True
+                iwatering = True
             else:
-                if intel_watering:
-                    raise ValueError('Your AFTER sequence is not compatible with intelligent watering'.format(self.args['after']['name'].upper()))
+                if iwatering:
+                    raise ValueError('Your AFTER sequence is not compatible with iWatering'.format(self.args['after']['name'].upper()))
 
-        return (intel_watering, setup)
+        if iwatering:
+            self.args['side'] = 'None'
+            if iwatering:
+                self.log("iWatering mode is engaged", 'warn')
+                if setup:
+                    self.log("Setting up iWatering: will make a record that you watered per schedule",'warn')
+                    if hassequence: self.log("And will try actual watering as well", 'warn')
+                try:
+                    self.args['side'] = next(i for i in self.sequences() if i['name'].lower() == 'Water [MLH] Side Garden'.lower())
+                except: pass
+
+        return iwatering
 
     # ------------------------------------------------------------------------------------------------------------------
+    # returns True if it is recommended to skip watering today
     def check_weather(self):
 
         self.load_weather()
@@ -232,18 +245,18 @@ class MLH(Farmware):
         today = d2s(today_local())
         if today in self.weather:
             if self.weather[today]['rain24'] > 1:  # small rain
-                self.log("Skipping due to rain today", 'warn')
+                self.log("Skipping watering due to rain today {}mm".format(self.weather[today]['rain24']), 'warn')
                 return True
 
         yesterday = d2s(today_local() - datetime.timedelta(days=1))
         if yesterday in self.weather:
             if self.weather[yesterday]['rain24'] > 10:  # medium rain
-                self.log("Skipping due to medium or heavy rain yesterday", 'warn')
+                self.log("Skipping watering due to medium or heavy rain yesterday {}mm".format(self.weather[yesterday]['rain24']), 'warn')
                 return True
         twodaysago = d2s(today_local() - datetime.timedelta(days=2))
         if twodaysago in self.weather:
             if self.weather[twodaysago]['rain24'] > 20:  # heavy rain
-                self.log("Skipping due to heavy rain 2 days ago", 'warn')
+                self.log("Skipping watering due to heavy rain 2 days ago {}mm".format(self.weather[twodaysago]['rain24']), 'warn')
                 return True
 
         return False
@@ -267,32 +280,25 @@ class MLH(Farmware):
         except:
             raise ValueError('Sequence not found: {}'.format(self.args[k].upper()))
 
-        #check if we need to enable intelligent watering
-        intel_watering=self.is_intellingent_watering()
-
-        skip=False
-        self.args['side'] = 'None'
-        if intel_watering[0]:
-            self.log("Intelligent watering mode is engaged",'warn')
-            skip=self.check_weather()==True
-            try: self.args['side']=next(i for i in self.sequences() if i['name'].lower() == 'Water [MLH] Side Garden'.lower())
-            except: pass
+        #check if we need to enable iWatering
+        iw=self.is_iwatering()
+        skip=self.check_weather() if iw else False
 
         # execute init sequence
         self.execute_sequence(self.args['init'], 'INIT: ')
 
-        # iterate over all eligible points
+        # iterate over all eligible plants
         for plant in plants:
             need_update=False
             message = 'Plant: ({:4d},{:4d}) {:15s} - {:s}'.format(plant['x'], plant['y'], plant['name'],self.to_str(plant))
 
             sq = self.args['after']
-            if intel_watering[0]:
+            if iw:
                 if plant['name'].lower() == 'side garden': sq=self.args['side']
-                if self.intelligent_watering(sq, plant, skip):
+                if self.iwatering(sq, plant, skip):
                     need_update=True
 
-            if not intel_watering[0] or need_update:
+            if not iw or need_update:
                 self.execute_sequence(self.args['before'], 'BEFORE: ')
                 if self.args['before']!=None or self.args['after']!=None:
                         if plant['name'].lower()!='side garden' and not skip:
