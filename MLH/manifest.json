@@ -3,7 +3,7 @@
  "language": "python",
  "author": "etcipnja",
  "description": "-DEV-  Mother's little helper to automate routine operations on multiple plants at once",
- "version": "2.3.3",
+ "version": "2.3.4",
  "min_os_version_major": 6,
  "url": "https://raw.githubusercontent.com/etcipnja/MLH/dev/MLH/manifest.json",
  "zip": "https://github.com/etcipnja/MLH/archive/dev.zip",

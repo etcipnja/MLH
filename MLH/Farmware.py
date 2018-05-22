@@ -3,6 +3,7 @@ import json
 import requests
 import datetime
 import ast
+import sys
 
 #timezone
 tz=0
@@ -12,37 +13,61 @@ def s2d(short_s): return datetime.datetime.strptime(short_s, "%Y-%m-%d")
 # date object to long date representation
 def d2l(date): return date.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
 def d2s(date): return date.strftime("%Y-%m-%d")
-# retrun today in UTC
+def l2u(date): return date-datetime.timedelta(hours=tz)
+def u2l(date): return date+datetime.timedelta(hours=tz)
 def today_utc(): return datetime.datetime.utcnow()
+def today_local(): return today_utc()+datetime.timedelta(hours=tz)
 
 
-class Farmware:
+class Farmware(object):
     # ------------------------------------------------------------------------------------------------------------------
     def __init__(self,app_name):
         self._points=None
         self._sequences=None
         self._tools=None
+        self.args = {}
         self.debug=False
+        self.local = False
         self.app_name=app_name
         self.api_url = 'https://my.farmbot.io/api/'
         try:
             self.headers = {'Authorization': 'Bearer ' + os.environ['API_TOKEN'], 'content-type': "application/json"}
+        except :
+            print("API_TOKEN is not set, you gonna have a bad time")
+            sys.exit(1)
 
+    # ------------------------------------------------------------------------------------------------------------------
+    def load_config(self):
+        try:
             global tz
             self.device = self.get('device')
             tz = self.device['tz_offset_hrs']
-            tz=-4
-        except :
-            print("API_TOKEN is not set, you gonna have bad time")
+        except Exception as e:
+            self.log(e,'error')
+
+    # ------------------------------------------------------------------------------------------------------------------
+    # loads config parameters
+    def get_arg(self, name, default):
+        prefix = self.app_name.lower().replace('-', '_')
+        self.args[name] = os.environ.get(prefix + '_'+name, default)
+
+        if name=='action':
+            if self.args[name]!='real':
+                if self.args[name] == 'local': self.local = True
+                self.debug = True
+                self.log("TEST MODE, NO sequences or movement will be run, plants will NOT be updated",'warn')
+        return self.args[name]
+
 
     # ------------------------------------------------------------------------------------------------------------------
     def log(self, message, message_type='info'):
 
         try:
-            log_message = '[{}] {}'.format(self.app_name, message)
-            node = {'kind': 'send_message', 'args': {'message': log_message, 'message_type': message_type}}
-            response = requests.post(os.environ['FARMWARE_URL'] + 'api/v1/celery_script', data=json.dumps(node),headers=self.headers)
-            response.raise_for_status()
+            if not self.local:
+                log_message = '[{}] {}'.format(self.app_name, message)
+                node = {'kind': 'send_message', 'args': {'message': log_message, 'message_type': message_type}}
+                response = requests.post(os.environ['FARMWARE_URL'] + 'api/v1/celery_script', data=json.dumps(node),headers=self.headers)
+                response.raise_for_status()
             message = log_message
         except: pass
 
@@ -165,12 +190,7 @@ class Farmware:
             self.weather = {k: v for (k, v) in self.weather.items() if
                             datetime.date.today() - s2d(k).date() < datetime.timedelta(days=7)}
 
-            # 1mm of rain is 90ml over 30x30sm
-            self.weather['rain_3']=int(round(sum(self.weather[key]['rain24'] for key in self.weather.keys()
-                                              if (today_utc() - s2d(key)).days < 3)))
         except:  pass
-
-        return today
 
     # ------------------------------------------------------------------------------------------------------------------
     def save_weather(self):
