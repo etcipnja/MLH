@@ -17,10 +17,10 @@ class MLH(Farmware):
 
         super(MLH,self).load_config()
         self.get_arg('action'       , "local")
-        self.get_arg('pointname'    , "Lettuce, Romaine Lettuce")
+        self.get_arg('pointname'    , "*")
         self.get_arg('default_z'    , -300)
         self.get_arg('filter_meta'  , "None")
-        self.get_arg('save_meta'    , "[('iwatering','setup')]")
+        self.get_arg('save_meta'    , "None")
         self.get_arg('init'         , "None")
         self.get_arg('before'       , "None")
         self.get_arg('after'        , "Water [MLH]")
@@ -134,7 +134,7 @@ class MLH(Farmware):
               'lettuce':        [  50,   50,   50,  100,  100,  100,  100,  100],
               'romaine lettuce':[  50,   50,   50,  100,  100,  100,  100,  100],
               'parsley':        [  10,   10,   10,   30,   30,   30,   30,   30],
-              'basil':          [  50,   50,   50,  400,  400,  400,  400,  400],
+              'basil':          [  50,   50,   50,  300,  400,  400,  400,  400],
               'eggplant':       [  50,   50,   50,  400,  400,  400,  400,  400],
               'side garden':    [3600, 3600, 3600, 3600, 3600, 3600, 3600, 3600]
             }
@@ -146,13 +146,6 @@ class MLH(Farmware):
         #calculating supposed watering for today
         try: supposed_watering = watering_needs[p['name'].lower()][int(age / 7)]
         except: raise ValueError('There is no plan for {} for week {}, aborting'.format(p['name'], int(age / 7)))
-
-        # are we in iWatering setup?
-        setup = False
-        if self.args['save_meta'] != None and ('iwatering', 'setup') in self.args['save_meta']:
-            p['meta']['iwatering'] = '{}'
-            setup = True
-            ml = supposed_watering
 
         #calculating actual_watering today
         actual_watering=0
@@ -172,6 +165,10 @@ class MLH(Farmware):
             #update watering sequence if needed
             if ms > 60000: raise ValueError("Really? more than 1 min of watering of a single plant - check your data!")
             if sequence!=None and not skip:
+
+                self.log("{} of age {}w watering was {}/{}ml -> watering for {}ml({}ms)".
+                         format(p['name'], int(age / 7) + 1, actual_watering, supposed_watering, ml, ms))
+
                 try:
                     wait = next(x for x in sequence['body'] if x['kind'] == 'wait')
                     if wait['args']['milliseconds']!=ms:
@@ -183,15 +180,10 @@ class MLH(Farmware):
                     raise ValueError("Update of watering sequence failed")
 
             #record watering amount into the meta
-            if not skip or setup:
+            if not skip:
                 watering_days[today_ls]+=ml
                 p['meta']['iwatering']=str(watering_days)
                 save=True
-
-            if sequence != None and not skip:
-                self.log("{} of age {}w last 3d watering was {}/{}ml -> watering for {}ml({}ms)".
-                     format(p['name'], int(age/7), actual_watering, supposed_watering, ml, ms))
-
 
         return save
 
@@ -208,27 +200,12 @@ class MLH(Farmware):
     # returns True if iWatering shall be enabled
     def is_iwatering(self):
 
-        setup=False
         iwatering = False
-        hassequence=False
-        if self.args['save_meta'] != None and ('iwatering', 'setup') in self.args['save_meta']:
-            setup=True
-            iwatering = True
         if self.args['after'] != None:
             if 'water' in self.args['after']['name'].lower() and '[mlh]' in self.args['after']['name'].lower():
-                if setup: hassequence=True
-                iwatering = True
-            else:
-                if iwatering:
-                    raise ValueError('Your AFTER sequence is not compatible with iWatering'.format(self.args['after']['name'].upper()))
-
-        if iwatering:
-            self.args['side'] = 'None'
-            if iwatering:
                 self.log("iWatering mode is engaged", 'warn')
-                if setup:
-                    self.log("Setting up iWatering: will make a record that you watered per schedule",'warn')
-                    if hassequence: self.log("And will try actual watering as well", 'warn')
+                iwatering = True
+                self.args['side'] = 'None'
                 try:
                     self.args['side'] = next(i for i in self.sequences() if i['name'].lower() == 'Water [MLH] Side Garden'.lower())
                 except: pass
