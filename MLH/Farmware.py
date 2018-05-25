@@ -150,6 +150,14 @@ class Farmware(object):
         return self._points
 
     # ------------------------------------------------------------------------------------------------------------------
+    def plant_age(self, p):
+
+        if p['pointer_type'].lower()!= 'plant': return 0
+        if p['plant_stage'] != 'planted': return 0
+        if p['planted_at'] == None: return 0
+        return (today_utc() - l2d(p['planted_at'])).days + 1
+
+    # ------------------------------------------------------------------------------------------------------------------
     def sequences(self):
         if self._sequences != None: return self._sequences
         self._sequences = self.get('sequences')

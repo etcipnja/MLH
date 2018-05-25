@@ -1,4 +1,4 @@
-import math
+import time
 from Farmware import *
 
 # inverses boolean expr basing on variable
@@ -18,12 +18,12 @@ class MLH(Farmware):
         super(MLH,self).load_config()
         self.get_arg('action'       , "real")
         self.get_arg('pointname'    , "*")
-        self.get_arg('default_z'    , -300)
+        self.get_arg('default_z'    , -400)
         self.get_arg('filter_meta'  , "None")
         self.get_arg('save_meta'    , "None")
         self.get_arg('init'         , "None")
         self.get_arg('before'       , "None")
-        self.get_arg('after'        , "Flash light")
+        self.get_arg('after'        , "Water [MLH]")
         self.get_arg('end'          , "None")
 
         try:
@@ -118,34 +118,53 @@ class MLH(Farmware):
         return need_update
 
     # ------------------------------------------------------------------------------------------------------------------
+    # retrun supposed watering for the plant with the given spread and age
+    # CHANGE HERE to fullfill your assumptions!!!
+    def get_supposed_watering(self, max_d, age):
+        min_d=2
+        step=max_d/(7*10.0) #I believe in 10 weeks after seeding the plant takes max area
+        d=step*age
+        if d<min_d: r=min_d
+        if d>max_d: r=max_d
+        return int(d*4)     #Magic multiplier that converts adjuseted diameter to ml
+
+    # ------------------------------------------------------------------------------------------------------------------
+    def get_travel_height(self, p, def_z):
+        min_h=20
+        max_h=p['meta']['height']
+        age=self.plant_age(p)
+        step=max_h/(7*10.0) #I believe in 10 weeks after seeding the plant takes max height
+        h=step*age
+        if h<min_h: r=min_h
+        if h>max_h: r=max_h
+        h=def_z+h
+        if def_z<0 and h>0: h=0
+        return int(h)
+    # ------------------------------------------------------------------------------------------------------------------
     #updates the watering sequence and meta. Returns True if waterign is needed
     def iwatering(self, sequence, p, skip):
 
-        if p['plant_stage'] != 'planted': return False
+        age = self.plant_age(p)
+        if age==0: return False
+
+        save = False
         today_ls = d2s(today_local())
 
-        # what I believe plants need every day in ml
-        #          Name            W1    W2    W3    W4    W5    W6    W7    W8
-        watering_needs = \
-            {'carrot':          [  10,   10,   10,   10,   50,   50,   50,  50],
-              'beets':          [  10,   10,   10,   10,   50,   50,   50,  50],
-              'zucchini':       [  50,   50,   50,  450,  400,  400,  400,  400],
-              'cabbage':        [  50,   50,   50,  100,  400,  400,  400,  400],
-              'lettuce':        [  50,   50,   50,  100,  100,  100,  100,  100],
-              'romaine lettuce':[  50,   50,   50,  100,  100,  100,  100,  100],
-              'parsley':        [  10,   10,   10,   30,   30,   30,   30,   30],
-              'basil':          [  50,   50,   50,  300,  400,  400,  400,  400],
-              'eggplant':       [  50,   50,   50,  400,  400,  400,  400,  400],
-              'side garden':    [3600, 3600, 3600, 3600, 3600, 3600, 3600, 3600]
-            }
+        if 'height' not in p['meta'] or 'spread' not in p['meta']:
+            if p['name'].lower() == 'side garden':
+                p['meta']['spread'] = 300 * 6
+                p['meta']['height'] = 100
+            else:
+                a=self.lookup_openfarm(p)['data'][0]['attributes']
+                p['meta']['spread'] = a['spread'] * 10
+                p['meta']['height'] = a['height'] * 10
+        else:
+            p['meta']['spread']=int(p['meta']['spread'])
+            p['meta']['height']=int(p['meta']['height'])
 
-        #Age
-        age = 0
-        if p['planted_at'] != None:  age = (today_utc() - l2d(p['planted_at'])).days
 
         #calculating supposed watering for today
-        try: supposed_watering = watering_needs[p['name'].lower()][int(age / 7)]
-        except: raise ValueError('There is no plan for {} for week {}, aborting'.format(p['name'], int(age / 7)))
+        supposed_watering = self.get_supposed_watering(p['meta']['spread'],age)
 
         #calculating actual_watering today
         actual_watering=0
@@ -160,14 +179,13 @@ class MLH(Farmware):
         ml = int(round(supposed_watering - actual_watering)) if supposed_watering>actual_watering else 0
         ms = int(ml / 80.0 * 1000)  #in my case watering nozzle produce 80ml in a sec
 
-        save = False
         if ml>0:
             #update watering sequence if needed
-            if ms > 60000: raise ValueError("Really? more than 1 min of watering of a single plant - check your data!")
+            #if ms > 120000: raise ValueError("Really? more than 1 min of watering of a single plant - check your data!")
             if sequence!=None and not skip:
 
-                self.log("{} of age {}w watering was {}/{}ml -> watering for {}ml({}ms)".
-                         format(p['name'], int(age / 7) + 1, actual_watering, supposed_watering, ml, ms))
+                self.log("{} of age {}d watering was {}/{}ml -> watering for {}ml({}ms)".
+                         format(p['name'], age, actual_watering, supposed_watering, ml, ms))
 
                 try:
                     wait = next(x for x in sequence['body'] if x['kind'] == 'wait')
@@ -175,9 +193,11 @@ class MLH(Farmware):
                         wait['args']['milliseconds'] = ms
                         self.log('Updating "{}" with {}ms and syncing ...'.format(sequence['name'],ms))
                         self.put("sequences/{}".format(sequence['id']), sequence)
+                        time.sleep(5)
                         self.sync()
                 except:
-                    raise ValueError("Update of watering sequence failed")
+                    if p['name'].lower()!='side garden':
+                        raise ValueError("Update of watering sequence {} failed".format(sequence['name'].upper()))
 
             #record watering amount into the meta
             if not skip:
@@ -207,7 +227,7 @@ class MLH(Farmware):
                 iwatering = True
                 self.args['side'] = 'None'
                 try:
-                    self.args['side'] = next(i for i in self.sequences() if i['name'].lower() == 'Water [MLH] Side Garden'.lower())
+                    self.args['side'] = next(i for i in self.sequences() if i['name'].lower() =='Water [MLH] Side Garden'.lower())
                 except: pass
 
         return iwatering
@@ -218,7 +238,7 @@ class MLH(Farmware):
 
         self.load_weather()
         self.log('Weather: {}'.format(self.weather))
-        # checking for the recent rains
+        # checking for the recent rain
         today = d2s(today_local())
         if today in self.weather:
             if self.weather[today]['rain24'] > 1:  # small rain
@@ -269,17 +289,19 @@ class MLH(Farmware):
             need_update=False
             message = 'Plant: ({:4d},{:4d}) {:15s} - {:s}'.format(plant['x'], plant['y'], plant['name'],self.to_str(plant))
 
+            travel_height=self.args['default_z']
             sq = self.args['after']
             if iw:
                 if plant['name'].lower() == 'side garden': sq=self.args['side']
                 if self.iwatering(sq, plant, skip):
+                    travel_height = self.get_travel_height(plant,self.args['default_z'])
                     need_update=True
 
             if not iw or need_update:
                 self.execute_sequence(self.args['before'], 'BEFORE: ')
                 if self.args['before']!=None or self.args['after']!=None:
                         if plant['name'].lower()!='side garden' and not skip:
-                            self.move_absolute({'x': plant['x'], 'y': plant['y'], 'z': self.args['default_z']})
+                            self.move_absolute({'x': plant['x'], 'y': plant['y'], 'z': travel_height})
 
                 if not skip: self.execute_sequence(sq, 'AFTER: ')
 
