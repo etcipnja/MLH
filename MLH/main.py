@@ -16,14 +16,14 @@ class MLH(Farmware):
     def load_config(self):
 
         super(MLH,self).load_config()
-        self.get_arg('action'       , "local")
+        self.get_arg('action'       , "real")
         self.get_arg('pointname'    , "*")
         self.get_arg('default_z'    , -300)
         self.get_arg('filter_meta'  , "None")
         self.get_arg('save_meta'    , "None")
         self.get_arg('init'         , "None")
         self.get_arg('before'       , "None")
-        self.get_arg('after'        , "Water [MLH]")
+        self.get_arg('after'        , "Flash light")
         self.get_arg('end'          , "None")
 
         try:
