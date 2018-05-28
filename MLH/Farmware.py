@@ -4,6 +4,8 @@ import requests
 import datetime
 import ast
 import sys
+import math
+import time
 
 #timezone
 tz=0
@@ -48,14 +50,22 @@ class Farmware(object):
     # ------------------------------------------------------------------------------------------------------------------
     # loads config parameters
     def get_arg(self, name, default):
-        prefix = self.app_name.lower().replace('-', '_')
-        self.args[name] = type(default)(os.environ.get(prefix + '_'+name, default))
+        try:
+            prefix = self.app_name.lower().replace('-', '_')
+            if type(default)!=tuple:
+                self.args[name] = type(default)(os.environ.get(prefix + '_'+name, default))
+            else:
+                self.args[name] = ast.literal_eval(os.environ.get(prefix + '_' + name, str(default)))
 
-        if name=='action':
-            if self.args[name]!='real':
-                if self.args[name] == 'local': self.local = True
-                self.debug = True
-                self.log("TEST MODE, NO sequences or movement will be run, plants will NOT be updated",'warn')
+            if self.args[name]=='None': self.args[name]=None
+            if name=='action':
+                if self.args[name]!='real':
+                    if self.args[name] == 'local': self.local = True
+                    self.debug = True
+                    self.log("TEST MODE, NO sequences or movement will be run, plants will NOT be updated",'warn')
+        except:
+            raise ValueError('Error parsing paramenter {}'.format(name))
+
         return self.args[name]
 
 
@@ -68,7 +78,7 @@ class Farmware(object):
                 node = {'kind': 'send_message', 'args': {'message': log_message, 'message_type': message_type}}
                 response = requests.post(os.environ['FARMWARE_URL'] + 'api/v1/celery_script', data=json.dumps(node),headers=self.headers)
                 response.raise_for_status()
-            message = log_message
+                message = log_message
         except: pass
 
         print(message)
@@ -76,6 +86,7 @@ class Farmware(object):
     # ------------------------------------------------------------------------------------------------------------------
     def sync(self):
         if not self.debug:
+            time.sleep(5)
             node = {'kind': 'sync', 'args': {}}
             response = requests.post(os.environ['FARMWARE_URL'] + 'api/v1/celery_script', data=json.dumps(node),headers=self.headers)
             response.raise_for_status()
@@ -95,7 +106,7 @@ class Farmware(object):
     # ------------------------------------------------------------------------------------------------------------------
     def post(self, enpoint, data):
         if not self.debug:
-            response = requests.put(self.api_url + enpoint, headers=self.headers, data=json.dumps(data))
+            response = requests.post(self.api_url + enpoint, headers=self.headers, data=json.dumps(data))
             response.raise_for_status()
             return response.json()
 
@@ -125,6 +136,13 @@ class Farmware(object):
                 response.raise_for_status()
 
     # ------------------------------------------------------------------------------------------------------------------
+    def read_status(self):
+        node = {'kind': 'read_status', 'args': {}}
+        response = requests.post(os.environ['FARMWARE_URL'] + 'api/v1/celery_script', data=json.dumps(node),
+                                 headers=self.headers)
+        response.raise_for_status()
+
+    # ------------------------------------------------------------------------------------------------------------------
     def move_absolute(self, location, offset={'x': 0, 'y': 0, 'z': 0}, message=''):
 
         if message!=None:
@@ -142,6 +160,7 @@ class Farmware(object):
             response = requests.post(os.environ['FARMWARE_URL'] + 'api/v1/celery_script', data=json.dumps(node),
                                      headers=self.headers)
             response.raise_for_status()
+        self.head = {'x': location['x']+offset['x'], 'y': location['y']+offset['y'], 'z': location['y']+offset['y']}
 
     # ------------------------------------------------------------------------------------------------------------------
     def points(self):
@@ -213,4 +232,11 @@ class Farmware(object):
             self.post('points/{}'.format(weather_station['id']), weather_station)
         except:
             raise ValueError("No watering tool detected (I save weather into the watering tool meta)")
+
+    # ------------------------------------------------------------------------------------------------------------------
+    def distance(self, p1, p2):
+        dx=math.fabs(p1['x']-p2['x'])
+        dy = math.fabs(p1['y'] - p2['y'])
+        return math.hypot(dx,dy)
+
 

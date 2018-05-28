@@ -1,4 +1,3 @@
-import time
 from Farmware import *
 
 # inverses boolean expr basing on variable
@@ -10,34 +9,25 @@ def invb(inverse, expr):
 class MLH(Farmware):
     def __init__(self):
         Farmware.__init__(self,((__file__.split(os.sep))[len(__file__.split(os.sep)) - 3]).replace('-master', '').replace('-dev',''))
+        self.chain_sequence = None
 
     # ------------------------------------------------------------------------------------------------------------------
     # loads config parameters
     def load_config(self):
 
         super(MLH,self).load_config()
-        self.get_arg('action'       , "real")
+        self.get_arg('action'       , "local")
         self.get_arg('pointname'    , "*")
         self.get_arg('default_z'    , -400)
-        self.get_arg('filter_meta'  , "None")
-        self.get_arg('save_meta'    , "None")
+        self.get_arg('filter_meta'  , 'None')
+        self.get_arg('save_meta'    , 'None')
         self.get_arg('init'         , "None")
         self.get_arg('before'       , "None")
-        self.get_arg('after'        , "Water [MLH]")
+        self.get_arg('after'        , "None")
         self.get_arg('end'          , "None")
 
-        try:
-            self.args['pointname']=self.args['pointname'].lower().split(',')
-            self.args['pointname'] = [x.strip(' ') for x in self.args['pointname']]
-            self.args['filter_meta'] = ast.literal_eval(self.args['filter_meta'])
-            self.args['save_meta'] = ast.literal_eval(self.args['save_meta'])
-
-            if not isinstance(self.args['filter_meta'], list) and self.args['filter_meta']!=None:
-                raise ValueError
-            if not isinstance(self.args['save_meta'], list) and self.args['save_meta']!=None:
-                raise ValueError
-        except:
-            raise ValueError("Invalid meta {} or {}".format(self.args['filter_meta'], self.args['save_meta']))
+        self.args['pointname']=self.args['pointname'].lower().split(',')
+        self.args['pointname'] = [x.strip(' ') for x in self.args['pointname']]
 
         self.log(str(self.args))
 
@@ -46,7 +36,13 @@ class MLH(Farmware):
     def is_eligible_point(self, p):
 
         if p['pointer_type'].lower() != 'plant': return False
-        if p['name'].lower() not in self.args['pointname'] and '*' not in self.args['pointname']: return False
+        inv=False
+        if '*' not in self.args['pointname']:
+            if '!' in self.args['pointname']: inv=True
+            if inv:
+                if p['name'].lower() in self.args['pointname']: return False
+            else:
+                if p['name'].lower() not in self.args['pointname']: return False
 
         # need to search by meta
         if self.args['filter_meta'] != None:
@@ -142,7 +138,7 @@ class MLH(Farmware):
         return int(h)
     # ------------------------------------------------------------------------------------------------------------------
     #updates the watering sequence and meta. Returns True if waterign is needed
-    def iwatering(self, sequence, p, skip):
+    def iwatering(self, sequence, p):
 
         age = self.plant_age(p)
         if age==0: return False
@@ -182,7 +178,7 @@ class MLH(Farmware):
         if ml>0:
             #update watering sequence if needed
             #if ms > 120000: raise ValueError("Really? more than 1 min of watering of a single plant - check your data!")
-            if sequence!=None and not skip:
+            if sequence!=None:
 
                 self.log("{} of age {}d watering was {}/{}ml -> watering for {}ml({}ms)".
                          format(p['name'], age, actual_watering, supposed_watering, ml, ms))
@@ -193,17 +189,15 @@ class MLH(Farmware):
                         wait['args']['milliseconds'] = ms
                         self.log('Updating "{}" with {}ms and syncing ...'.format(sequence['name'],ms))
                         self.put("sequences/{}".format(sequence['id']), sequence)
-                        time.sleep(5)
                         self.sync()
                 except:
                     if p['name'].lower()!='side garden':
                         raise ValueError("Update of watering sequence {} failed".format(sequence['name'].upper()))
 
             #record watering amount into the meta
-            if not skip:
-                watering_days[today_ls]+=ml
-                p['meta']['iwatering']=str(watering_days)
-                save=True
+            watering_days[today_ls]+=ml
+            p['meta']['iwatering']=str(watering_days)
+            save=True
 
         return save
 
@@ -223,12 +217,12 @@ class MLH(Farmware):
         iwatering = False
         if self.args['after'] != None:
             if 'water' in self.args['after']['name'].lower() and '[mlh]' in self.args['after']['name'].lower():
-                self.log("iWatering mode is engaged", 'warn')
-                iwatering = True
-                self.args['side'] = 'None'
-                try:
-                    self.args['side'] = next(i for i in self.sequences() if i['name'].lower() =='Water [MLH] Side Garden'.lower())
-                except: pass
+                if self.args['before']==None:
+                    self.log("iWatering mode is engaged", 'warn')
+                    iwatering = True
+                    try:
+                        self.args['side'] = next(i for i in self.sequences() if i['name'].lower() =='Water [MLH] Side Garden'.lower())
+                    except: pass
 
         return iwatering
 
@@ -242,47 +236,101 @@ class MLH(Farmware):
         today = d2s(today_local())
         if today in self.weather:
             if self.weather[today]['rain24'] > 1:  # small rain
-                self.log("Skipping watering due to rain today {}mm".format(self.weather[today]['rain24']), 'warn')
+                self.log("Will skip watering due to rain today {}mm".format(self.weather[today]['rain24']), 'warn')
                 return True
 
         yesterday = d2s(today_local() - datetime.timedelta(days=1))
         if yesterday in self.weather:
             if self.weather[yesterday]['rain24'] > 10:  # medium rain
-                self.log("Skipping watering due to medium or heavy rain yesterday {}mm".format(self.weather[yesterday]['rain24']), 'warn')
+                self.log("Will skip watering due to medium or heavy rain yesterday {}mm".format(self.weather[yesterday]['rain24']), 'warn')
                 return True
         twodaysago = d2s(today_local() - datetime.timedelta(days=2))
         if twodaysago in self.weather:
             if self.weather[twodaysago]['rain24'] > 20:  # heavy rain
-                self.log("Skipping watering due to heavy rain 2 days ago {}mm".format(self.weather[twodaysago]['rain24']), 'warn')
+                self.log("Will skip watering due to heavy rain 2 days ago {}mm".format(self.weather[twodaysago]['rain24']), 'warn')
                 return True
 
         return False
+
+    # ------------------------------------------------------------------------------------------------------------------
+    def check_chain_watering(self, p):
+
+        if self.chain_sequence==None:
+            self.chain_plants=[]
+            try:
+                self.chain_sequence = next(i for i in self.sequences() if i['name'].lower() == ('Water [MLH] '+ p['name']).lower())
+            except: pass
+
+        if self.chain_sequence!=None and self.chain_sequence['name'].lower() == ('Water [MLH] ' + p['name']).lower():
+            if len(self.chain_plants)==0:
+                self.chain_plants.append(p)
+            else:
+                if self.distance(self.chain_plants[-1],p)>2*p['spread']:
+                    return False
+                else:
+                    self.chain_plants.append(p)
+            return True
+
+        return False
+
     # ------------------------------------------------------------------------------------------------------------------
     def run(self):
-
-        #processing points
-        plants = [x for x in self.points() if self.is_eligible_point(x)]
-        if len(plants) == 0:
-            self.log('No plants selected by the filter, aborting','warn')
-            return
-
-        self.log('{} plants selected by the filter'.format(len(plants)), 'success')
-        plants = sorted(plants, key=lambda elem: ( elem['name'], int(elem['x']), int(elem['y'])))
 
         #processing sequences
         try:
             for k in ('init','before','after','end'):
-                if self.args[k].lower()== 'none': self.args[k]=None
-                else: self.args[k]=next(i for i in self.sequences() if i['name'].lower() == self.args[k].lower())
+                if self.args[k]!=None:
+                    self.args[k]=next(i for i in self.sequences() if i['name'].lower() == self.args[k].lower())
         except:
             raise ValueError('Sequence not found: {}'.format(self.args[k].upper()))
 
         #check if we need to enable iWatering
         iw=self.is_iwatering()
         skip=self.check_weather() if iw else False
+        skip=False
+
+
+        #processing points
+        plants = [x for x in self.points() if self.is_eligible_point(x)]
+        if len(plants) == 0:
+            self.log('No plants selected by the filter, aborting','warn')
+            return
+        self.log('{} plants selected by the filter'.format(len(plants)), 'success')
 
         # execute init sequence
         self.execute_sequence(self.args['init'], 'INIT: ')
+
+        self.head={'x': 0, 'y': 0, 'z': 0}
+        processed=[]
+
+        while True:
+            distances=[(self.distance(x, self.head), x) for x in plants if x['name'] not in processed]
+            if len(distances) == 0: break  # all done
+            d,p=min(distances)
+            to_process=self.sort([ x for x in plants if x['name']==p['name']])
+            self.process_plants(to_process, iw, skip)
+            processed.append(p['name'])
+
+        # execute end sequence
+        self.execute_sequence(self.args['end'], "END: ")
+
+    # ------------------------------------------------------------------------------------------------------------------
+    def sort(self, plants):
+        totalDist = 0
+        tr = sorted(plants, key=lambda elem: (int(elem['x']), int(elem['y'])))
+        bl = sorted(plants, key=lambda elem: (int(elem['x']), int(-elem['y'])))
+        dist, cur=min([ (self.distance(self.head,p), p) for p in (tr[0], tr[-1], bl[0], bl[-1])])
+        path = [cur]
+        for i in range(1,len(plants)):
+            dists = [(self.distance(cur,p), p) for p in plants if p not in path]
+            nextDist, cur = min(dists)
+            totalDist += nextDist
+            path.append(cur)
+
+        return path
+
+    # ------------------------------------------------------------------------------------------------------------------
+    def process_plants(self, plants, iw, skip):
 
         # iterate over all eligible plants
         for plant in plants:
@@ -291,9 +339,10 @@ class MLH(Farmware):
 
             travel_height=self.args['default_z']
             sq = self.args['after']
-            if iw:
+            if iw and not skip:
                 if plant['name'].lower() == 'side garden': sq=self.args['side']
-                if self.iwatering(sq, plant, skip):
+                #if self.check_chain_watering(plant): continue
+                if self.iwatering(sq, plant):
                     travel_height = self.get_travel_height(plant,self.args['default_z'])
                     need_update=True
 
@@ -312,9 +361,7 @@ class MLH(Farmware):
                 self.put("points/{}".format(plant['id']), plant)
 
             self.log(message)
-
-        # execute end sequence
-        self.execute_sequence(self.args['end'], "END: ")
+            self.head = {'x': plant['x'], 'y': plant['y'], 'z': travel_height}
 
 
 # ----------------------------------------------------------------------------------------------------------------------

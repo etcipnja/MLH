@@ -1,9 +1,9 @@
 # Problem:
 
 When you have to deal with a lot of plants you might be puzzled that you have to create a dedicated sequence for each
-instance of a plant. For exmaple: if you have 10 carrots - you probably need to create a watering sequence for every carrot
+instance of a plant. For example: if you have 10 carrots - you probably need to create a watering sequence for every carrot
 individually. (Disclaimer: I seriously hope that I am missing something and there is a standard solution for this
-problem. But so far I don't know about any - so I wrote this farmware to help myself)
+problem. But so far I don't know about any - so I created this farmware to help myself)
 
 # Solution:
 
@@ -21,6 +21,8 @@ The idea is to write a loop that executes needed sequences for each eligible pla
 
 - FILTER BY PLANT NAME
     - Filter by plant names (comma separated) for example "Carrot, Beets", case insensitive, '*' means select all
+    - You can negate search by providing '!' as the first element. For example "!, Carrot, Beets" selects all but
+    Carrots and Beets
 - FILTER BY META DATA
     - MetaData is a piece of information (key:value) saved with the plant. Unfortunatelly you won't see it anywhere on
     the Farm Designer, but it is printed to the log. This farmware can update metadata, so you can use it in the
