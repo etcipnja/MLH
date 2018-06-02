@@ -6,6 +6,7 @@ import ast
 import sys
 import math
 import time
+import base64
 
 #timezone
 tz=0
@@ -42,8 +43,6 @@ class Weather(object):
     # ------------------------------------------------------------------------------------------------------------------
     def load(self):
 
-        today = (datetime.datetime.utcnow() + datetime.timedelta(hours=tz)).strftime('%Y-%m-%d')
-
         try:
             weather_station = None
             try:
@@ -64,7 +63,6 @@ class Weather(object):
     # ------------------------------------------------------------------------------------------------------------------
     def save(self):
 
-        weather_station = None
         try:
             watering_tool = next(x for x in self.fw.tools() if 'water' in x['name'].lower())
             weather_station = next(x for x in self.fw.points() if x['pointer_type'] == 'ToolSlot'
@@ -87,21 +85,34 @@ class Farmware(object):
         self.local = False
         self.app_name=app_name
         self.weather=Weather(self)
-        self.api_url = 'https://my.farmbot.io/api/'
+
         try:
-            self.headers = {'Authorization': 'Bearer ' + os.environ['API_TOKEN'], 'content-type': "application/json"}
+            self.api_token=os.environ['API_TOKEN']
+            self.headers = {'Authorization': 'Bearer ' + self.api_token, 'content-type': "application/json"}
+            encoded_payload = self.api_token.split('.')[1]
+            encoded_payload += '=' * (4 - len(encoded_payload) % 4)
+            token = json.loads(base64.b64decode(encoded_payload).decode('utf-8'))
+            self.bot_id=token['bot']
+            self.api_url = 'https:'+token['iss']+'/api/'
+            self.mqtt_url=token['mqtt']
         except :
             print("API_TOKEN is not set, you gonna have a bad time")
             sys.exit(1)
 
     # ------------------------------------------------------------------------------------------------------------------
+    def print_token(self, login, password):
+        data = {'user': {'email': login, 'password': password}}
+        response=self.post('tokens',data)
+
+        print("Device id: {}".format(response['token']['unencoded']['bot']))
+        print("MQTT Host: {}".format(response['token']['unencoded']['mqtt']))
+        print("API_TOKEN: {}".format(response['token']['encoded']))
+        return response
+    # ------------------------------------------------------------------------------------------------------------------
     def load_config(self):
-        try:
-            global tz
-            self.device = self.get('device')
-            tz = self.device['tz_offset_hrs']
-        except Exception as e:
-            self.log(e,'error')
+        global tz
+        device = self.get('device')
+        tz = device['tz_offset_hrs']
 
     # ------------------------------------------------------------------------------------------------------------------
     # loads config parameters
@@ -202,7 +213,7 @@ class Farmware(object):
     def move_absolute_safe(self, location, offset={'x': 0, 'y': 0, 'z': 0}, message=''):
         try:
             if self.head['z']<location['z']:
-                self.move_absolute_ex({'x':self.head['x'],'y':self.head['y'],'z':location['z']}, {'x': 0, 'y': 0, 'z': 0}, None)
+                self.move_absolute({'x':self.head['x'],'y':self.head['y'],'z':location['z']}, {'x': 0, 'y': 0, 'z': 0}, None)
         except:  pass
         self.move_absolute(location,offset,message)
 

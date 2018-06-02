@@ -15,10 +15,19 @@ class MLH(Farmware):
     # loads config parameters
     def load_config(self):
 
+        #ASSUMPTIONS - CHANGE HERE TO ADJUST TO YOU CASE
+        self.ml_per_sec=80.0    #my pump produces 80ml per sec
+        self.coming_of_age=10   #I believe that in 10 weeks plant becomes an adult (i.e. takes the full height and spread)
+        self.magic_d2lm=4       #Magic mutiplier to convert plant size to ml needed for watering
+        self.small_rain=1       #1mm is a small rain (cancells watering today)
+        self.medium_rain=10     #10mm is a medium rain (cancells watering today and tomorrow)
+        self.big_rain=20        #20mm is a big rain (cancells watering today, tomorrow and day after tomorrow)
+
+
         super(MLH,self).load_config()
         self.get_arg('action'       , "local")
         self.get_arg('pointname'    , "*")
-        self.get_arg('default_z'    , -400)
+        self.get_arg('default_z'    , -380)
         self.get_arg('filter_meta'  , 'None')
         self.get_arg('save_meta'    , 'None')
         self.get_arg('init'         , "None")
@@ -114,22 +123,21 @@ class MLH(Farmware):
         return need_update
 
     # ------------------------------------------------------------------------------------------------------------------
-    # retrun supposed watering for the plant with the given spread and age
-    # CHANGE HERE to fullfill your assumptions!!!
+    # return supposed watering for the plant with the given spread and age
     def get_supposed_watering(self, max_d, age):
         min_d=2
-        step=max_d/(7*10.0) #I believe in 10 weeks after seeding the plant takes max area
+        step=max_d/(7.0*self.coming_of_age)
         d=step*age
         if d<min_d: r=min_d
         if d>max_d: r=max_d
-        return int(d*4)     #Magic multiplier that converts adjuseted diameter to ml
+        return int(d*self.magic_d2lm)
 
     # ------------------------------------------------------------------------------------------------------------------
     def get_travel_height(self, p, def_z):
-        min_h=20
+        min_h=0
         max_h=int(p['meta']['height'])
         age=self.plant_age(p)
-        step=max_h/(7*10.0) #I believe in 10 weeks after seeding the plant takes max height
+        step=max_h/(7.0*self.coming_of_age)
         h=step*age
         if h<min_h: r=min_h
         if h>max_h: r=max_h
@@ -147,7 +155,7 @@ class MLH(Farmware):
         today_ls = d2s(today_local())
 
         if 'height' not in p['meta'] or 'spread' not in p['meta']:
-            if p['name'].lower() == 'side garden':
+            if p['name'].lower() == 'side garden':  #I also have a side garden - you need to ignore this
                 p['meta']['spread'] = 300 * 6
                 p['meta']['height'] = 100
             else:
@@ -173,7 +181,7 @@ class MLH(Farmware):
 
         #how much to water in ml
         ml = int(round(supposed_watering - actual_watering)) if supposed_watering>actual_watering else 0
-        ms = int(ml / 80.0 * 1000)  #in my case watering nozzle produce 80ml in a sec
+        ms = int(ml / self.ml_per_sec * 1000)  #in my case watering nozzle produce 80ml in a sec
 
         if ml>0:
             #update watering sequence if needed
@@ -191,8 +199,7 @@ class MLH(Farmware):
                         self.put("sequences/{}".format(sequence['id']), sequence)
                         self.sync()
                 except:
-                    if p['name'].lower()!='side garden':
-                        raise ValueError("Update of watering sequence {} failed".format(sequence['name'].upper()))
+                    raise ValueError("Update of watering sequence {} failed".format(sequence['name'].upper()))
 
             #record watering amount into the meta
             watering_days[today_ls]+=ml
@@ -221,6 +228,7 @@ class MLH(Farmware):
                     self.log("iWatering mode is engaged", 'warn')
                     iwatering = True
                     try:
+                        # I also have a side garden - you need to ignore this
                         self.args['side'] = next(i for i in self.sequences() if i['name'].lower() =='Water [MLH] Side Garden'.lower())
                     except: pass
 
@@ -228,25 +236,25 @@ class MLH(Farmware):
 
     # ------------------------------------------------------------------------------------------------------------------
     # returns True if it is recommended to skip watering today
-    def need_2skip_watering(self):
+    def skip_watering(self):
 
         self.weather.load()
         self.log('Weather: \n{}'.format(self.weather))
         # checking for the recent rain
         today = d2s(today_local())
         if today in self.weather():
-            if self.weather()[today]['rain24'] > 1:  # small rain
+            if self.weather()[today]['rain24'] > self.small_rain:  # small rain
                 self.log("Will skip watering due to rain today {}mm".format(self.weather()[today]['rain24']), 'warn')
                 return True
 
         yesterday = d2s(today_local() - datetime.timedelta(days=1))
         if yesterday in self.weather():
-            if self.weather()[yesterday]['rain24'] > 10:  # medium rain
+            if self.weather()[yesterday]['rain24'] > self.medium_rain:  # medium rain
                 self.log("Will skip watering due to medium or heavy rain yesterday {}mm".format(self.weather()[yesterday]['rain24']), 'warn')
                 return True
         twodaysago = d2s(today_local() - datetime.timedelta(days=2))
         if twodaysago in self.weather():
-            if self.weather()[twodaysago]['rain24'] > 20:  # heavy rain
+            if self.weather()[twodaysago]['rain24'] > self.big_rain:  # heavy rain
                 self.log("Will skip watering due to heavy rain 2 days ago {}mm".format(self.weather()[twodaysago]['rain24']), 'warn')
                 return True
 
@@ -254,11 +262,25 @@ class MLH(Farmware):
 
     # ------------------------------------------------------------------------------------------------------------------
     def check_special_watering(self, name):
-
         sq=None
         try: sq = next(i for i in self.sequences() if all(x in i['name'].lower() for x in ['mlh','water',name.lower()]))
         except: pass
         return sq
+
+    # ------------------------------------------------------------------------------------------------------------------
+    def sort_plants(self, plants):
+        totalDist = 0
+        tr = sorted(plants, key=lambda elem: (int(elem['x']), int(elem['y'])))
+        bl = sorted(plants, key=lambda elem: (int(elem['x']), int(-elem['y'])))
+        dist, cur=min([ (self.distance(self.head,p), p) for p in (tr[0], tr[-1], bl[0], bl[-1])])
+        path = [cur]
+        for i in range(1,len(plants)):
+            dists = [(self.distance(cur,p), p) for p in plants if p not in path]
+            nextDist, cur = min(dists)
+            totalDist += nextDist
+            path.append(cur)
+
+        return path
 
     # ------------------------------------------------------------------------------------------------------------------
     def run(self):
@@ -273,7 +295,7 @@ class MLH(Farmware):
 
         #check if we need to enable iWatering
         iw=self.is_iwatering()
-        skip=self.need_2skip_watering() if iw else False
+        skip=self.skip_watering() if iw else False
         #skip=False
 
 
@@ -294,7 +316,7 @@ class MLH(Farmware):
             distances=[(self.distance(x, self.head), x) for x in plants if x['name'] not in processed]
             if len(distances) == 0: break  # all done
             d,p=min(distances)
-            to_process=self.sort([ x for x in plants if x['name']==p['name']])
+            to_process=self.sort_plants([x for x in plants if x['name'] == p['name']])
             self.process_plants(to_process, iw, skip)
             processed.append(p['name'])
 
@@ -302,24 +324,8 @@ class MLH(Farmware):
         self.execute_sequence(self.args['end'], "END: ")
 
     # ------------------------------------------------------------------------------------------------------------------
-    def sort(self, plants):
-        totalDist = 0
-        tr = sorted(plants, key=lambda elem: (int(elem['x']), int(elem['y'])))
-        bl = sorted(plants, key=lambda elem: (int(elem['x']), int(-elem['y'])))
-        dist, cur=min([ (self.distance(self.head,p), p) for p in (tr[0], tr[-1], bl[0], bl[-1])])
-        path = [cur]
-        for i in range(1,len(plants)):
-            dists = [(self.distance(cur,p), p) for p in plants if p not in path]
-            nextDist, cur = min(dists)
-            totalDist += nextDist
-            path.append(cur)
-
-        return path
-
-    # ------------------------------------------------------------------------------------------------------------------
     def process_plants(self, plants, iw, skip):
 
-        special = None
         travel_height = self.args['default_z']
         if iw and not skip:
             special = self.check_special_watering(plants[0]['name'])
@@ -367,9 +373,6 @@ if __name__ == "__main__":
         app.run()
         sys.exit(0)
 
-    except NameError as error:
-        app.log('SYNTAX!: {}'.format(str(error)), 'error')
-        raise
     except requests.exceptions.HTTPError as error:
         app.log('HTTP error {} {} '.format(error.response.status_code,error.response.text[0:100]), 'error')
     except Exception as e:

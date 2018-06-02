@@ -2,8 +2,7 @@
 
 When you have to deal with a lot of plants you might be puzzled that you have to create a dedicated sequence for each
 instance of a plant. For example: if you have 10 carrots - you probably need to create a watering sequence for every carrot
-individually. (Disclaimer: I seriously hope that I am missing something and there is a standard solution for this
-problem. But so far I don't know about any - so I created this farmware to help myself)
+individually.
 
 # Solution:
 
@@ -14,7 +13,7 @@ The idea is to write a loop that executes needed sequences for each eligible pla
     - Execute a sequence before moving to plant's location  (Example: "Grab a seed")
     - Move to plant's location
     - Execute a sequence at plant's location                (Example: "Plant a seed")
-    - Update plant tags 	                                (Example: "Mark this instance of carrot as "planted")
+    - Update plant meta 	                                (Example: "Mark this instance of carrot as "planted")
 - Execute end sequence                                      (Example: "Return seeder")
 
 # Reference:
@@ -24,7 +23,7 @@ The idea is to write a loop that executes needed sequences for each eligible pla
     - You can negate search by providing '!' as the first element. For example "!, Carrot, Beets" selects all but
     Carrots and Beets
 - FILTER BY META DATA
-    - MetaData is a piece of information (key:value) saved with the plant. Unfortunatelly you won't see it anywhere on
+    - Meta is a piece of information (key:value) saved with the plant. Unfortunately, you won't see it anywhere in
     the Farm Designer, but it is printed to the log. This farmware can update metadata, so you can use it in the
     filter later. See below about expected format and examples.
 - INIT SEQUENCE NAME
@@ -36,12 +35,12 @@ The idea is to write a loop that executes needed sequences for each eligible pla
 - END SEQUENCE NAME
     - Sequence to be executed at the end (one time)
 - SAVE IN META DATA
-    - Each plant will get its meta data updated upon successful completion of "AFTER" sequence. Please see below about
+    - Each plant will get it's meta data updated upon successful completion of "AFTER" sequence. Please see below about
     expected format and examples
 - DEFAULT Z AXIS VALUE WHEN MOVING
     - Z coordinate for the head while moving to the plant's location
 - WHAT TO DO
-    - "test" to skip actual movements and sequences (but still update meta data)
+    - "test" to skip actual movements, sequences and don't update meta
     - OR "real" - for the real action
 
 Meta data fields require specially formatted input. In Python it is called "list of tupple pairs". Here is the example:
@@ -51,13 +50,13 @@ Meta data fields require specially formatted input. In Python it is called "list
 ```
 
 You can use whatever you want as a ‘key' and ‘value’ as long as they are strings.
-More than one element in the list allows you to filter by multiple criteria and update multiple meta data tags at once!
+More than one element in the list allows you to filter by multiple criteria and update multiple meta data at once!
 Put "None" if you want to skip metadata feature.
 
-There are special words with special meaning:
+There are special keys and values with special meaning:
 - key ‘plant_stage’ will not deal with metadata, instead it works with the attribute “Status” visible
 in Farm Designer for every plant. Only valid values that go with this key are ‘planned’, ‘planted’ and ‘harvested’
-- key ‘del’ in SAVE filed causes to delete currently saved meta data for this plant. If ‘value' is ‘*’ - all metadata is
+- key ‘del’ in SAVE filed causes to delete existing meta data for this plant. If ‘value' is ‘*’ - all metadata is
 deleted, otherwise only one key specified in ‘value’ is deleted
 - value ‘today’ is replaced with actual today’s date. In FILTER you can write ‘!today’ which means “not today’.
 
@@ -74,8 +73,8 @@ Seed all "planned" Carrots and mark them "planted"
 - SAVE IN META DATA:                [('plant_stage','planted')]
 ```
 
-Please note that if you interrupt this sequence and restart it - it won't start seeding again from the beginning becasue
-already seeded plants are marked as "planted" and won't be selected again.
+Please note that if you interrupt this sequence and restart it - it won't start seeding again from the beginning because
+already seeded plants are marked as "planted" and won't be selected again in the next run.
 
 
 Water all "planted" Carrots that have not been watered today
@@ -110,6 +109,36 @@ Delete watering tag from all plants that were watered today
 - SAVE IN META DATA:                [('del','last_watering')]
 ```
 
+# Intelligent watering (iWatering):
+
+Intelligent watering tries to solve problem that watering shall depend of:
+- plant size
+- plant age
+- current weather condition
+
+To engage iWatering mode you need to provide AFTER sequence name that has 'water' and 'mlh' in it (For example:
+"Water [MLH]"). This sequence shall be doing the following
+- opening watering valve
+- waiting 1 sec
+- closing watering valve
+It can also do whatever you want, the only important part is "waiting"
+The idea is that Farmware will update the "waiting" duration basing on its understanding of how much water this
+particular plant needs. Note: My assumptions about this may be different from yours - if you are not happy with it -
+fork my project and help yourself.
+
+Weather reading is taken from my other farmware "Netatmo". Please note that MLH doesn't call Netatmo explicitly. I
+recommend to create a sequence like "Water All" and call Netatmo and MLH from there one after another.
+
+iWatering skips the watering today if
+- there was a rain today >1mm
+- there was a rain yesterday >10mm
+- there was a rain 2 days ago >20mm
+
+If you want to provide custom sequence for watering of your particular plant name - call it so it has 'water', 'mlh' and
+<your_plant_name> in its name. In this case this sequence will be called once for all plants of this name and no
+built-in watering will be performed. For example if farmware finds "Water [MLH] - Carrot" - this sequence will be called
+when all carrots have to be watered and "Water [MLH]" will NOT be called.
+
 # Installation:
 
 Use this manifest to register farmware
@@ -121,11 +150,14 @@ I noticed that if you change a parameter in WebApplication/Farmware form - you n
 field before you click "RUN". Otherwise old value is  passed to farmware script even though the new value
 is displayed in the form.
 
+In Intelligent Watering mode I need to update  watering sequence and sync it from within the farmware.
+Sync function doesn't work stable sometimes. As the result the correct duration is not pushed to the bot and watering
+will be wrong. This is pretty important problem as it may ruin your plants with excessive watering. I plan to submit
+ticket to support as it is a problem of the platform, not the farmware.
 
 # Credits:
 
 The original idea belongs to @rdegosse with his Loop-Plants-With-Filters. https://github.com/rdegosse/Loop-Plants-With-Filters/blob/master/README.md
-This Farmware - is a simplified version of it with nice perks about saving/filtering meta data
 
 Thank you,
 Eugene
