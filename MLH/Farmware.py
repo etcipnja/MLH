@@ -20,6 +20,61 @@ def u2l(date): return date+datetime.timedelta(hours=tz)
 def today_utc(): return datetime.datetime.utcnow()
 def today_local(): return today_utc()+datetime.timedelta(hours=tz)
 
+class Weather(object):
+    # ------------------------------------------------------------------------------------------------------------------
+    def __init__(self, fw):
+        self.weather = {}
+        self.fw=fw
+    # ------------------------------------------------------------------------------------------------------------------
+    def __repr__(self):
+        return "Weather()"
+    # ------------------------------------------------------------------------------------------------------------------
+    def __str__(self):
+        l=self.weather.items()
+        l.sort(key=lambda x: s2d(x[0]),reverse=True)
+        ret=""
+        for r in l:
+            ret+="{} : {:.2f}mm, [{:.2f}-{:.2f}]C\n".format(r[0],r[1]['rain24'],r[1]['min_temperature'],r[1]['max_temperature'])
+        return ret
+    # ------------------------------------------------------------------------------------------------------------------
+    def __call__(self):
+        return self.weather
+    # ------------------------------------------------------------------------------------------------------------------
+    def load(self):
+
+        today = (datetime.datetime.utcnow() + datetime.timedelta(hours=tz)).strftime('%Y-%m-%d')
+
+        try:
+            weather_station = None
+            try:
+                watering_tool = next(x for x in self.fw.tools() if 'water' in x['name'].lower())
+                weather_station = next(x for x in self.fw.points() if x['pointer_type'] == 'ToolSlot'
+                                       and x['tool_id'] == watering_tool['id'])
+            except Exception as e:
+                self.fw.log("No watering tool detected (I save weather into the watering tool meta)")
+
+            self.weather = ast.literal_eval(weather_station['meta']['current_weather'])
+            if not isinstance(self.weather, dict): raise ValueError
+            # leave only last 7 days
+            self.weather = {k: v for (k, v) in self.weather.items() if
+                            datetime.date.today() - s2d(k).date() < datetime.timedelta(days=7)}
+
+        except:  pass
+
+    # ------------------------------------------------------------------------------------------------------------------
+    def save(self):
+
+        weather_station = None
+        try:
+            watering_tool = next(x for x in self.fw.tools() if 'water' in x['name'].lower())
+            weather_station = next(x for x in self.fw.points() if x['pointer_type'] == 'ToolSlot'
+                                   and x['tool_id'] == watering_tool['id'])
+            weather_station['meta']['current_weather'] = str(self.weather)
+            self.fw.post('points/{}'.format(weather_station['id']), weather_station)
+        except:
+            raise ValueError("No watering tool detected (I save weather into the watering tool meta)")
+
+
 
 class Farmware(object):
     # ------------------------------------------------------------------------------------------------------------------
@@ -31,6 +86,7 @@ class Farmware(object):
         self.debug=False
         self.local = False
         self.app_name=app_name
+        self.weather=Weather(self)
         self.api_url = 'https://my.farmbot.io/api/'
         try:
             self.headers = {'Authorization': 'Bearer ' + os.environ['API_TOKEN'], 'content-type': "application/json"}
@@ -143,6 +199,14 @@ class Farmware(object):
         response.raise_for_status()
 
     # ------------------------------------------------------------------------------------------------------------------
+    def move_absolute_safe(self, location, offset={'x': 0, 'y': 0, 'z': 0}, message=''):
+        try:
+            if self.head['z']<location['z']:
+                self.move_absolute_ex({'x':self.head['x'],'y':self.head['y'],'z':location['z']}, {'x': 0, 'y': 0, 'z': 0}, None)
+        except:  pass
+        self.move_absolute(location,offset,message)
+
+    # ------------------------------------------------------------------------------------------------------------------
     def move_absolute(self, location, offset={'x': 0, 'y': 0, 'z': 0}, message=''):
 
         if message!=None:
@@ -194,44 +258,6 @@ class Farmware(object):
             'https://openfarm.cc/api/v1/crops?include=pictures&filter={}'.format(plant['openfarm_slug']), headers=self.headers)
         response.raise_for_status()
         return response.json()
-
-    # ------------------------------------------------------------------------------------------------------------------
-    def load_weather(self):
-
-        self.weather = {}
-        today = (datetime.datetime.utcnow()+ datetime.timedelta(hours=tz)).strftime('%Y-%m-%d')
-
-        try:
-            weather_station = None
-            try:
-                watering_tool = next(x for x in self.tools() if 'water' in x['name'].lower())
-                weather_station = next(x for x in self.points() if x['pointer_type'] == 'ToolSlot'
-                                       and x['tool_id'] == watering_tool['id'])
-            except Exception as e:
-                self.log("No watering tool detected (I save weather into the watering tool meta)")
-
-            self.weather = ast.literal_eval(weather_station['meta']['current_weather'])
-            if not isinstance(self.weather, dict): raise ValueError
-            # leave only last 7 days
-            if 'rain_3' in self.weather.keys(): del self.weather['rain_3']
-            self.weather = {k: v for (k, v) in self.weather.items() if
-                            datetime.date.today() - s2d(k).date() < datetime.timedelta(days=7)}
-
-        except:  pass
-
-    # ------------------------------------------------------------------------------------------------------------------
-    def save_weather(self):
-
-        weather_station = None
-        try:
-            if 'rain_3' in self.weather.keys(): del self.weather['rain_3']
-            watering_tool = next(x for x in self.tools() if 'water' in x['name'].lower())
-            weather_station = next(x for x in self.points() if x['pointer_type'] == 'ToolSlot'
-                                   and x['tool_id'] == watering_tool['id'])
-            weather_station['meta']['current_weather'] = str(self.weather)
-            self.post('points/{}'.format(weather_station['id']), weather_station)
-        except:
-            raise ValueError("No watering tool detected (I save weather into the watering tool meta)")
 
     # ------------------------------------------------------------------------------------------------------------------
     def distance(self, p1, p2):

@@ -23,7 +23,7 @@ class MLH(Farmware):
         self.get_arg('save_meta'    , 'None')
         self.get_arg('init'         , "None")
         self.get_arg('before'       , "None")
-        self.get_arg('after'        , "None")
+        self.get_arg('after'        , "Water [MLH]")
         self.get_arg('end'          , "None")
 
         self.args['pointname']=self.args['pointname'].lower().split(',')
@@ -127,7 +127,7 @@ class MLH(Farmware):
     # ------------------------------------------------------------------------------------------------------------------
     def get_travel_height(self, p, def_z):
         min_h=20
-        max_h=p['meta']['height']
+        max_h=int(p['meta']['height'])
         age=self.plant_age(p)
         step=max_h/(7*10.0) #I believe in 10 weeks after seeding the plant takes max height
         h=step*age
@@ -216,7 +216,7 @@ class MLH(Farmware):
 
         iwatering = False
         if self.args['after'] != None:
-            if 'water' in self.args['after']['name'].lower() and '[mlh]' in self.args['after']['name'].lower():
+            if all(x in self.args['after']['name'].lower() for x in ['mlh', 'water']):
                 if self.args['before']==None:
                     self.log("iWatering mode is engaged", 'warn')
                     iwatering = True
@@ -228,50 +228,37 @@ class MLH(Farmware):
 
     # ------------------------------------------------------------------------------------------------------------------
     # returns True if it is recommended to skip watering today
-    def check_weather(self):
+    def need_2skip_watering(self):
 
-        self.load_weather()
-        self.log('Weather: {}'.format(self.weather))
+        self.weather.load()
+        self.log('Weather: \n{}'.format(self.weather))
         # checking for the recent rain
         today = d2s(today_local())
-        if today in self.weather:
-            if self.weather[today]['rain24'] > 1:  # small rain
-                self.log("Will skip watering due to rain today {}mm".format(self.weather[today]['rain24']), 'warn')
+        if today in self.weather():
+            if self.weather()[today]['rain24'] > 1:  # small rain
+                self.log("Will skip watering due to rain today {}mm".format(self.weather()[today]['rain24']), 'warn')
                 return True
 
         yesterday = d2s(today_local() - datetime.timedelta(days=1))
-        if yesterday in self.weather:
-            if self.weather[yesterday]['rain24'] > 10:  # medium rain
-                self.log("Will skip watering due to medium or heavy rain yesterday {}mm".format(self.weather[yesterday]['rain24']), 'warn')
+        if yesterday in self.weather():
+            if self.weather()[yesterday]['rain24'] > 10:  # medium rain
+                self.log("Will skip watering due to medium or heavy rain yesterday {}mm".format(self.weather()[yesterday]['rain24']), 'warn')
                 return True
         twodaysago = d2s(today_local() - datetime.timedelta(days=2))
-        if twodaysago in self.weather:
-            if self.weather[twodaysago]['rain24'] > 20:  # heavy rain
-                self.log("Will skip watering due to heavy rain 2 days ago {}mm".format(self.weather[twodaysago]['rain24']), 'warn')
+        if twodaysago in self.weather():
+            if self.weather()[twodaysago]['rain24'] > 20:  # heavy rain
+                self.log("Will skip watering due to heavy rain 2 days ago {}mm".format(self.weather()[twodaysago]['rain24']), 'warn')
                 return True
 
         return False
 
     # ------------------------------------------------------------------------------------------------------------------
-    def check_chain_watering(self, p):
+    def check_special_watering(self, name):
 
-        if self.chain_sequence==None:
-            self.chain_plants=[]
-            try:
-                self.chain_sequence = next(i for i in self.sequences() if i['name'].lower() == ('Water [MLH] '+ p['name']).lower())
-            except: pass
-
-        if self.chain_sequence!=None and self.chain_sequence['name'].lower() == ('Water [MLH] ' + p['name']).lower():
-            if len(self.chain_plants)==0:
-                self.chain_plants.append(p)
-            else:
-                if self.distance(self.chain_plants[-1],p)>2*p['spread']:
-                    return False
-                else:
-                    self.chain_plants.append(p)
-            return True
-
-        return False
+        sq=None
+        try: sq = next(i for i in self.sequences() if all(x in i['name'].lower() for x in ['mlh','water',name.lower()]))
+        except: pass
+        return sq
 
     # ------------------------------------------------------------------------------------------------------------------
     def run(self):
@@ -286,8 +273,8 @@ class MLH(Farmware):
 
         #check if we need to enable iWatering
         iw=self.is_iwatering()
-        skip=self.check_weather() if iw else False
-        skip=False
+        skip=self.need_2skip_watering() if iw else False
+        #skip=False
 
 
         #processing points
@@ -332,16 +319,23 @@ class MLH(Farmware):
     # ------------------------------------------------------------------------------------------------------------------
     def process_plants(self, plants, iw, skip):
 
+        special = None
+        travel_height = self.args['default_z']
+        if iw and not skip:
+            special = self.check_special_watering(plants[0]['name'])
+            if special!=None:
+                self.log('All [{}] are handled by dedicated sequence {}'.format(plants[0]['name'], special['name']), 'warn')
+                self.execute_sequence(special)
+                skip=True
+
         # iterate over all eligible plants
         for plant in plants:
             need_update=False
             message = 'Plant: ({:4d},{:4d}) {:15s} - {:s}'.format(plant['x'], plant['y'], plant['name'],self.to_str(plant))
 
-            travel_height=self.args['default_z']
             sq = self.args['after']
             if iw and not skip:
                 if plant['name'].lower() == 'side garden': sq=self.args['side']
-                #if self.check_chain_watering(plant): continue
                 if self.iwatering(sq, plant):
                     travel_height = self.get_travel_height(plant,self.args['default_z'])
                     need_update=True
@@ -350,7 +344,7 @@ class MLH(Farmware):
                 self.execute_sequence(self.args['before'], 'BEFORE: ')
                 if self.args['before']!=None or self.args['after']!=None:
                         if plant['name'].lower()!='side garden' and not skip:
-                            self.move_absolute({'x': plant['x'], 'y': plant['y'], 'z': travel_height})
+                            self.move_absolute_safe({'x': plant['x'], 'y': plant['y'], 'z': travel_height})
 
                 if not skip: self.execute_sequence(sq, 'AFTER: ')
 
