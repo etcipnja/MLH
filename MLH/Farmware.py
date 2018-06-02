@@ -35,7 +35,7 @@ class Weather(object):
         l.sort(key=lambda x: s2d(x[0]),reverse=True)
         ret=""
         for r in l:
-            ret+="{} : {:.2f}mm, [{:.2f}-{:.2f}]C\n".format(r[0],r[1]['rain24'],r[1]['min_temperature'],r[1]['max_temperature'])
+            ret+="{} : {: >05.2f}mm, [{: >6.2f} -{: >6.2f}]C\n".format(r[0],r[1]['rain24'],r[1]['min_temperature'],r[1]['max_temperature'])
         return ret
     # ------------------------------------------------------------------------------------------------------------------
     def __call__(self):
@@ -68,9 +68,9 @@ class Weather(object):
             weather_station = next(x for x in self.fw.points() if x['pointer_type'] == 'ToolSlot'
                                    and x['tool_id'] == watering_tool['id'])
             weather_station['meta']['current_weather'] = str(self.weather)
-            self.fw.post('points/{}'.format(weather_station['id']), weather_station)
         except:
             raise ValueError("No watering tool detected (I save weather into the watering tool meta)")
+        self.fw.put('points/{}'.format(weather_station['id']), weather_station)
 
 
 
@@ -93,7 +93,8 @@ class Farmware(object):
             encoded_payload += '=' * (4 - len(encoded_payload) % 4)
             token = json.loads(base64.b64decode(encoded_payload).decode('utf-8'))
             self.bot_id=token['bot']
-            self.api_url = 'https:'+token['iss']+'/api/'
+            #self.api_url = 'https:'+token['iss']+'/api/'
+            self.api_url='https://my.farmbot.io/api/'
             self.mqtt_url=token['mqtt']
         except :
             print("API_TOKEN is not set, you gonna have a bad time")

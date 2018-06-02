@@ -111,16 +111,17 @@ Delete watering tag from all plants that were watered today
 
 # Intelligent watering (iWatering):
 
-Intelligent watering tries to solve problem that watering shall depend of:
+Intelligent watering tries to solve a problem that watering shall depend of:
 - plant size
 - plant age
-- current weather condition
+- weather condition
 
 To engage iWatering mode you need to provide AFTER sequence name that has 'water' and 'mlh' in it (For example:
 "Water [MLH]"). This sequence shall be doing the following
 - opening watering valve
 - waiting 1 sec
 - closing watering valve
+
 It can also do whatever you want, the only important part is "waiting"
 The idea is that Farmware will update the "waiting" duration basing on its understanding of how much water this
 particular plant needs. Note: My assumptions about this may be different from yours - if you are not happy with it -
@@ -129,7 +130,8 @@ fork my project and help yourself.
 Weather reading is taken from my other farmware "Netatmo". Please note that MLH doesn't call Netatmo explicitly. I
 recommend to create a sequence like "Water All" and call Netatmo and MLH from there one after another.
 
-iWatering skips the watering today if
+iWatering skips the watering today if:
+- plant was already watered today
 - there was a rain today >1mm
 - there was a rain yesterday >10mm
 - there was a rain 2 days ago >20mm
