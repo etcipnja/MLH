@@ -117,22 +117,24 @@ class Farmware(object):
 
     # ------------------------------------------------------------------------------------------------------------------
     # loads config parameters
-    def get_arg(self, name, default):
+    def get_arg(self, name, default, tp):
         try:
             prefix = self.app_name.lower().replace('-', '_')
-            if type(default)!=tuple:
-                self.args[name] = type(default)(os.environ.get(prefix + '_'+name, default))
+            if tp!=list:
+                self.args[name] = tp(os.environ.get(prefix + '_'+name, default))
+                if self.args[name] == 'None': self.args[name] = None
             else:
                 self.args[name] = ast.literal_eval(os.environ.get(prefix + '_' + name, str(default)))
+                if type(self.args[name])!=tp and self.args[name]!=None:
+                    raise ValueError
 
-            if self.args[name]=='None': self.args[name]=None
             if name=='action':
                 if self.args[name]!='real':
                     if self.args[name] == 'local': self.local = True
                     self.debug = True
                     self.log("TEST MODE, NO sequences or movement will be run, plants will NOT be updated",'warn')
         except:
-            raise ValueError('Error parsing paramenter {}'.format(name))
+            raise ValueError('Error parsing paramenter [{}]'.format(name))
 
         return self.args[name]
 

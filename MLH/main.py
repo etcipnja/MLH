@@ -25,15 +25,15 @@ class MLH(Farmware):
 
 
         super(MLH,self).load_config()
-        self.get_arg('action'       , "local")
-        self.get_arg('pointname'    , "*")
-        self.get_arg('default_z'    , -380)
-        self.get_arg('filter_meta'  , 'None')
-        self.get_arg('save_meta'    , 'None')
-        self.get_arg('init'         , "None")
-        self.get_arg('before'       , "None")
-        self.get_arg('after'        , "Water [MLH]")
-        self.get_arg('end'          , "None")
+        self.get_arg('action'       , "real", str)
+        self.get_arg('pointname'    , "*", str)
+        self.get_arg('default_z'    , -380, int)
+        self.get_arg('filter_meta'  , None, list)
+        self.get_arg('save_meta'    , [('del','tdy')],list)
+        self.get_arg('init'         , None, str)
+        self.get_arg('before'       , None, str)
+        self.get_arg('after'        , None, str)
+        self.get_arg('end'          , None, str)
 
         self.args['pointname']=self.args['pointname'].lower().split(',')
         self.args['pointname'] = [x.strip(' ') for x in self.args['pointname']]
@@ -69,7 +69,8 @@ class MLH(Farmware):
                 elif key == 'planted_at':
                     if p['planted_at']==None:
                         if not invb(inverse, val.lower()=='none'): return False
-                    dv=d2s(l2d(p['planted_at']))
+                    planted=p['planted_at'] if p['planted_at']!=None else  "1980-01-01T00:00:00.000Z"
+                    dv=d2s(l2d(planted))
                     if not invb(inverse, dv == val): return False
                 else:
                     if key in p['meta']:
