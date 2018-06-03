@@ -56,6 +56,8 @@ Put "None" if you want to skip metadata feature.
 There are special keys and values with special meaning:
 - key ‘plant_stage’ will not deal with metadata, instead it works with the attribute “Status” visible
 in Farm Designer for every plant. Only valid values that go with this key are ‘planned’, ‘planted’ and ‘harvested’
+- key 'planted_at' - also not stored in meta - this is the date when plant was planted. It's value shall be in the format
+YYYY-MM-DD (Example: "2018-04-15")
 - key ‘del’ in SAVE filed causes to delete existing meta data for this plant. If ‘value' is ‘*’ - all metadata is
 deleted, otherwise only one key specified in ‘value’ is deleted
 - value ‘today’ is replaced with actual today’s date. In FILTER you can write ‘!today’ which means “not today’.
@@ -109,6 +111,18 @@ Delete watering tag from all plants that were watered today
 - SAVE IN META DATA:                [('del','last_watering')]
 ```
 
+Sets up the date when the plants were planted
+```
+- FILTER BY PLANT NAME:             Carrots
+- FILTER BY META DATA:              [('plant_stage','planted')
+- INIT SEQUENCE NAME:               None
+- SEQUENCE NAME BEFORE NEXT MOVE:   None
+- SEQUENCE NAME AFTER MOVE:         None
+- END SEQUENCE NAME:                None
+- SAVE IN META DATA:                [('planted_at','2018-04-01')    #YYYY-MM-DD
+```
+
+
 # Intelligent watering (iWatering):
 
 Intelligent watering tries to solve a problem that watering shall depend of:
@@ -135,6 +149,16 @@ iWatering skips the watering today if:
 - there was a rain today >1mm
 - there was a rain yesterday >10mm
 - there was a rain 2 days ago >20mm
+
+IMPORTANT: The amount of watering is calculated basing on plant's age - make sure your planted_at date is set correctly.
+See above for example.
+
+Algorithm to calculate the amount of watering:
+- get plant spread from openfarm
+- adjust spread to plant's age
+- convert spread (mm) into volume (ml) using my best guess
+- convert ml into ms assuming that water nozzle produces 80ml every 1000ms
+- update the delay in watering sequence
 
 If you want to provide custom sequence for watering of your particular plant name - call it so it has 'water', 'mlh' and
 <your_plant_name> in its name. In this case this sequence will be called once for all plants of this name and no
