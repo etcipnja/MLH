@@ -113,6 +113,7 @@ class Farmware(object):
     def load_config(self):
         global tz
         device = self.get('device')
+        self.head = self.state()['location_data']['position']
         tz = device['tz_offset_hrs']
 
     # ------------------------------------------------------------------------------------------------------------------
@@ -156,10 +157,27 @@ class Farmware(object):
     # ------------------------------------------------------------------------------------------------------------------
     def sync(self):
         if not self.debug:
-            time.sleep(5)
+            cnt=0
+            while (self.state()['informational_settings']['sync_status'] != "sync_now"):
+                cnt+=1
+                time.sleep(1)
+                if cnt>30: raise ValueError('Sync error, bot is not ready to sync')
+
             node = {'kind': 'sync', 'args': {}}
             response = requests.post(os.environ['FARMWARE_URL'] + 'api/v1/celery_script', data=json.dumps(node),headers=self.headers)
             response.raise_for_status()
+
+            cnt = 0
+            while (get_bot_state()['informational_settings']['sync_status'] == "syncing"):
+                cnt += 1
+                time.sleep(1)
+                if cnt > 30: raise ValueError('Sync error, bot failed to complete syncing')
+
+    # ------------------------------------------------------------------------------------------------------------------
+    def state(self):
+            response = requests.get(os.environ['FARMWARE_URL'] + '/api/v1/bot/state', headers=self.headers)
+            response.raise_for_status()
+            return response.json()
 
     # ------------------------------------------------------------------------------------------------------------------
     def get(self, enpoint):

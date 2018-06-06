@@ -156,13 +156,14 @@ class MLH(Farmware):
         today_ls = d2s(today_local())
 
         if 'height' not in p['meta'] or 'spread' not in p['meta']:
-            if p['name'].lower() == 'side garden':  #I also have a side garden - you need to ignore this
-                p['meta']['spread'] = 300 * 6
-                p['meta']['height'] = 100
-            else:
+            try:
                 a=self.lookup_openfarm(p)['data'][0]['attributes']
                 p['meta']['spread'] = a['spread'] * 10
                 p['meta']['height'] = a['height'] * 10
+            except:
+                self.log("Open farm doesn't seem to know about {}, consider creating individual sequence".format(p['name']))
+                p['meta']['spread'] = 5
+                p['meta']['height'] = 5
         else:
             p['meta']['spread']=int(p['meta']['spread'])
             p['meta']['height']=int(p['meta']['height'])
@@ -228,10 +229,6 @@ class MLH(Farmware):
                 if self.args['before']==None:
                     self.log("iWatering mode is engaged", 'warn')
                     iwatering = True
-                    try:
-                        # I also have a side garden - you need to ignore this
-                        self.args['side'] = next(i for i in self.sequences() if i['name'].lower() =='Water [MLH] Side Garden'.lower())
-                    except: pass
 
         return iwatering
 
@@ -310,7 +307,6 @@ class MLH(Farmware):
         # execute init sequence
         self.execute_sequence(self.args['init'], 'INIT: ')
 
-        self.head={'x': 0, 'y': 0, 'z': 0}
         processed=[]
 
         while True:
@@ -342,7 +338,6 @@ class MLH(Farmware):
 
             sq = self.args['after']
             if iw and not skip:
-                if plant['name'].lower() == 'side garden': sq=self.args['side']
                 if self.iwatering(sq, plant):
                     travel_height = self.get_travel_height(plant,self.args['default_z'])
                     need_update=True
@@ -350,7 +345,7 @@ class MLH(Farmware):
             if not iw or need_update:
                 self.execute_sequence(self.args['before'], 'BEFORE: ')
                 if self.args['before']!=None or self.args['after']!=None:
-                        if plant['name'].lower()!='side garden' and not skip:
+                        if not skip:
                             self.move_absolute_safe({'x': plant['x'], 'y': plant['y'], 'z': travel_height})
 
                 if not skip: self.execute_sequence(sq, 'AFTER: ')
