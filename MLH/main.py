@@ -18,7 +18,7 @@ class MLH(Farmware):
         #ASSUMPTIONS - CHANGE HERE TO ADJUST TO YOU CASE
         self.ml_per_sec=80.0    #my pump produces 80ml per sec
         self.coming_of_age=10   #I believe that in 10 weeks plant becomes an adult (i.e. takes the full height and spread)
-        self.magic_d2lm=4       #Magic mutiplier to convert plant size to ml needed for watering
+        self.magic_d2lm=3       #Magic mutiplier to convert plant size to ml needed for watering
         self.small_rain=1       #1mm is a small rain (cancells watering today)
         self.medium_rain=10     #10mm is a medium rain (cancells watering today and tomorrow)
         self.big_rain=20        #20mm is a big rain (cancells watering today, tomorrow and day after tomorrow)
