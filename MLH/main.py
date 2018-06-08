@@ -16,8 +16,8 @@ class MLH(Farmware):
     def load_config(self):
 
         #ASSUMPTIONS - CHANGE HERE TO ADJUST TO YOU CASE
-        self.ml_per_sec=80.0    #my pump produces 80ml per sec
-        self.coming_of_age=10   #I believe that in 10 weeks plant becomes an adult (i.e. takes the full height and spread)
+        self.ml_per_sec=80.0    #my pump produces 80ml/sec
+        self.coming_of_age=7*15 #I believe that in 15 weeks plant becomes an adult (i.e. takes the full height and spread)
         self.magic_d2lm=3       #Magic mutiplier to convert plant size to ml needed for watering
         self.small_rain=1       #1mm is a small rain (cancells watering today)
         self.medium_rain=10     #10mm is a medium rain (cancells watering today and tomorrow)
@@ -26,7 +26,7 @@ class MLH(Farmware):
 
         super(MLH,self).load_config()
         self.get_arg('action'       , "local", str)
-        self.get_arg('pointname'    , "*", str)
+        self.get_arg('pointname'    , "Pepper", str)
         self.get_arg('default_z'    , -380, int)
         self.get_arg('filter_meta'  , None, list)
         self.get_arg('save_meta'    , None,list)
@@ -127,7 +127,7 @@ class MLH(Farmware):
     # return supposed watering for the plant with the given spread and age
     def get_supposed_watering(self, max_d, age):
         min_d=2
-        step=max_d/(7.0*self.coming_of_age)
+        step=max_d/float(self.coming_of_age)
         d=step*age
         if d<min_d: r=min_d
         if d>max_d: r=max_d
@@ -138,7 +138,7 @@ class MLH(Farmware):
         min_h=0
         max_h=int(p['meta']['height'])
         age=self.plant_age(p)
-        step=max_h/(7.0*self.coming_of_age)
+        step=max_h/float(self.coming_of_age)
         h=step*age
         if h<min_h: r=min_h
         if h>max_h: r=max_h
@@ -182,12 +182,11 @@ class MLH(Farmware):
         else: watering_days[today_ls]=0
 
         #how much to water in ml
-        ml = int(round(supposed_watering - actual_watering)) if supposed_watering>actual_watering else 0
-        ms = int(ml / self.ml_per_sec * 1000)  #in my case watering nozzle produce 80ml in a sec
+        ml = int(round(supposed_watering - actual_watering)) if supposed_watering>1.2*actual_watering else 0
+        ms = int(ml / self.ml_per_sec * 1000)
 
         if ml>0:
             #update watering sequence if needed
-            #if ms > 120000: raise ValueError("Really? more than 1 min of watering of a single plant - check your data!")
             if sequence!=None:
 
                 self.log("{} of age {}d watering was {}/{}ml -> watering for {}ml({}ms)".
