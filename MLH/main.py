@@ -26,7 +26,7 @@ class MLH(Farmware):
 
         super(MLH,self).load_config()
         self.get_arg('action'       , "local", str)
-        self.get_arg('pointname'    , "Pepper", str)
+        self.get_arg('pointname'    , "*", str)
         self.get_arg('default_z'    , -380, int)
         self.get_arg('filter_meta'  , None, list)
         self.get_arg('save_meta'    , None,list)
@@ -93,8 +93,6 @@ class MLH(Farmware):
                 if val.lower() == 'today': val = d2s(today_local())
 
                 # check for special values
-                if key =='iwatering':
-                    continue
                 if key == 'del':
                     if val == '*' and p['meta'] != {}:
                         p['meta'] = {}
@@ -322,13 +320,21 @@ class MLH(Farmware):
     # ------------------------------------------------------------------------------------------------------------------
     def process_plants(self, plants, iw, skip):
 
+        today_ls = d2s(today_local())
         travel_height = self.args['default_z']
+        special=None
+        watering_days={}
+
         if iw and not skip:
             special = self.check_special_watering(plants[0]['name'])
             if special!=None:
-                self.log('All [{}] are handled by dedicated sequence {}'.format(plants[0]['name'], special['name']), 'warn')
-                self.execute_sequence(special)
-                skip=True
+                skip = True
+                if 'iwatering' not in plants[0]['meta']: plants[0]['meta']['iwatering']={}
+                else: watering_days = ast.literal_eval(plants[0]['meta']['iwatering'])
+                if today_ls not in watering_days:
+                    self.log('All [{}] are handled by dedicated sequence {}'.format(plants[0]['name'], special['name']), 'warn')
+                    self.execute_sequence(special)
+
 
         # iterate over all eligible plants
         for plant in plants:
@@ -349,6 +355,10 @@ class MLH(Farmware):
 
                 if not skip: self.execute_sequence(sq, 'AFTER: ')
 
+            if special!=None:
+                watering_days[today_ls]=1
+                plant['meta']['iwatering'] = str(watering_days)
+                need_update = True
             if self.update_meta(plant): need_update=True
 
             if need_update:
