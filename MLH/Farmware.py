@@ -88,6 +88,7 @@ class Farmware(object):
 
         try:
             self.api_token=os.environ['API_TOKEN']
+            self.farmware_url=os.environ['FARMWARE_URL']
             self.headers = {'Authorization': 'Bearer ' + self.api_token, 'content-type': "application/json"}
             encoded_payload = self.api_token.split('.')[1]
             encoded_payload += '=' * (4 - len(encoded_payload) % 4)
@@ -97,7 +98,7 @@ class Farmware(object):
             self.api_url='https://my.farmbot.io/api/'
             self.mqtt_url=token['mqtt']
         except :
-            print("API_TOKEN is not set, you gonna have a bad time")
+            print("API_TOKEN or FARMWARE_URL is not set, you gonna have a bad time")
             sys.exit(1)
 
     # ------------------------------------------------------------------------------------------------------------------
@@ -147,7 +148,7 @@ class Farmware(object):
             if not self.local:
                 log_message = '[{}] {}'.format(self.app_name, message)
                 node = {'kind': 'send_message', 'args': {'message': log_message, 'message_type': message_type}}
-                response = requests.post(os.environ['FARMWARE_URL'] + 'api/v1/celery_script', data=json.dumps(node),headers=self.headers)
+                response = requests.post(self.farmware_url + 'api/v1/celery_script', data=json.dumps(node),headers=self.headers)
                 response.raise_for_status()
                 message = log_message
         except: pass
@@ -159,19 +160,22 @@ class Farmware(object):
         if not self.debug:
             time.sleep(10)
 
+        for i in range(1,2):
             node = {'kind': 'sync', 'args': {}}
-            response = requests.post(os.environ['FARMWARE_URL'] + 'api/v1/celery_script', data=json.dumps(node),headers=self.headers)
+            response = requests.post(self.farmware_url + 'api/v1/celery_script', data=json.dumps(node),headers=self.headers)
             response.raise_for_status()
 
             for cnt in range(1,30):
                 sync=self.state()['informational_settings']['sync_status']
-                if  sync== "synced": break
+                self.log("Sync status {}".format(sync))
+                if sync== "synced" or sync == "sync failed": break
                 time.sleep(1)
             if cnt>=30: raise ValueError('Sync error, bot failed to complete syncing')
+            if sync != "sync failed": break
 
     # ------------------------------------------------------------------------------------------------------------------
     def state(self):
-            response = requests.get(os.environ['FARMWARE_URL'] + '/api/v1/bot/state', headers=self.headers)
+            response = requests.get(self.farmware_url + '/api/v1/bot/state', headers=self.headers)
             response.raise_for_status()
             return response.json()
 
@@ -215,24 +219,16 @@ class Farmware(object):
                 self.log('{}Executing sequence: {}({})'.format(message, sequence['name'].upper(), sequence['id']))
             if not self.debug:
                 node = {'kind': 'execute', 'args': {'sequence_id': sequence['id']}}
-                response = requests.post(os.environ['FARMWARE_URL'] + 'api/v1/celery_script', data=json.dumps(node),
+                response = requests.post(self.farmware_url + 'api/v1/celery_script', data=json.dumps(node),
                                          headers=self.headers)
                 response.raise_for_status()
 
     # ------------------------------------------------------------------------------------------------------------------
     def read_status(self):
         node = {'kind': 'read_status', 'args': {}}
-        response = requests.post(os.environ['FARMWARE_URL'] + 'api/v1/celery_script', data=json.dumps(node),
+        response = requests.post(self.farmware_url + 'api/v1/celery_script', data=json.dumps(node),
                                  headers=self.headers)
         response.raise_for_status()
-
-    # ------------------------------------------------------------------------------------------------------------------
-    def move_absolute_safe(self, location, offset={'x': 0, 'y': 0, 'z': 0}, message=''):
-        try:
-            if self.head['z']<location['z']:
-                self.move_absolute({'x':self.head['x'],'y':self.head['y'],'z':location['z']}, {'x': 0, 'y': 0, 'z': 0}, None)
-        except:  pass
-        self.move_absolute(location,offset,message)
 
     # ------------------------------------------------------------------------------------------------------------------
     def move_absolute(self, location, offset={'x': 0, 'y': 0, 'z': 0}, message=''):
@@ -249,10 +245,10 @@ class Farmware(object):
                 }
 
         if not self.debug:
-            response = requests.post(os.environ['FARMWARE_URL'] + 'api/v1/celery_script', data=json.dumps(node),
+            response = requests.post(self.farmware_url + 'api/v1/celery_script', data=json.dumps(node),
                                      headers=self.headers)
             response.raise_for_status()
-        self.head = {'x': location['x']+offset['x'], 'y': location['y']+offset['y'], 'z': location['y']+offset['y']}
+        self.head = {'x': location['x']+offset['x'], 'y': location['y']+offset['y'], 'z': location['z']+offset['z']}
 
     # ------------------------------------------------------------------------------------------------------------------
     def points(self):

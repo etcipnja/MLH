@@ -15,7 +15,7 @@ class MLH(Farmware):
     # loads config parameters
     def load_config(self):
 
-        #ASSUMPTIONS - CHANGE HERE TO ADJUST TO YOU CASE
+        #ASSUMPTIONS - CHANGE HERE TO ADJUST TO YOUR CASE
         self.ml_per_sec=80.0    #my pump produces 80ml/sec
         self.coming_of_age=7*15 #I believe that in 15 weeks plant becomes an adult (i.e. takes the full height and spread)
         self.magic_d2lm=3       #Magic mutiplier to convert plant size to ml needed for watering
@@ -25,14 +25,14 @@ class MLH(Farmware):
 
 
         super(MLH,self).load_config()
-        self.get_arg('action'       , "local", str)
-        self.get_arg('pointname'    , "*", str)
+        self.get_arg('action'       , "real", str)
+        self.get_arg('pointname'    , "Carrot", str)
         self.get_arg('default_z'    , -380, int)
         self.get_arg('filter_meta'  , None, list)
-        self.get_arg('save_meta'    , None,list)
+        self.get_arg('save_meta'    , [('planted_at','2018-05-02')],list)
         self.get_arg('init'         , None, str)
         self.get_arg('before'       , None, str)
-        self.get_arg('after'        , 'Water [MLH]', str)
+        self.get_arg('after'        , None, str)
         self.get_arg('end'          , None, str)
 
         self.args['pointname']=self.args['pointname'].lower().split(',')
@@ -54,7 +54,7 @@ class MLH(Farmware):
                 if p['name'].lower() not in self.args['pointname']: return False
 
         # need to search by meta
-        if self.args['filter_meta'] != None:
+        if self.args['filter_meta'] is not None:
             for t in self.args['filter_meta']:
                 key=t[0]
                 val = t[1]
@@ -67,9 +67,9 @@ class MLH(Farmware):
                 if key == 'plant_stage':
                     if not invb(inverse, p[key] == val): return False
                 elif key == 'planted_at':
-                    if p['planted_at']==None:
+                    if p['planted_at'] is None:
                         if not invb(inverse, val.lower()=='none'): return False
-                    planted=p['planted_at'] if p['planted_at']!=None else  "1980-01-01T00:00:00.000Z"
+                    planted=p['planted_at'] if p['planted_at'] is not None else "1980-01-01T00:00:00.000Z"
                     dv=d2s(l2d(planted))
                     if not invb(inverse, dv == val): return False
                 else:
@@ -86,7 +86,7 @@ class MLH(Farmware):
     def update_meta(self, p):
 
         need_update = False
-        if self.args['save_meta'] != None:
+        if self.args['save_meta'] is not None:
             for t in self.args['save_meta']:
                 key=t[0]
                 val = t[1]
@@ -110,7 +110,7 @@ class MLH(Farmware):
                             need_update = True
                     elif key == 'planted_at':
                         skip=False
-                        if p['planted_at']!=None:
+                        if p['planted_at'] is not None:
                             if d2s(u2l(l2d(p['planted_at'])))==val: skip=True
                         if not skip:
                             p[key] = d2l(l2u(s2d(val)))
@@ -145,7 +145,7 @@ class MLH(Farmware):
         return int(h)
     # ------------------------------------------------------------------------------------------------------------------
     #updates the watering sequence and meta. Returns True if waterign is needed
-    def iwatering(self, sequence, p):
+    def do_iwatering(self, sequence, p):
 
         age = self.plant_age(p)
         if age==0: return False
@@ -159,7 +159,7 @@ class MLH(Farmware):
                 p['meta']['spread'] = a['spread'] * 10
                 p['meta']['height'] = a['height'] * 10
             except:
-                self.log("Open farm doesn't seem to know about {}, consider creating individual sequence".format(p['name']))
+                self.log("Open farm doesn't seem to know about {}, consider creating dedicated sequence".format(p['name']))
                 p['meta']['spread'] = 5
                 p['meta']['height'] = 5
         else:
@@ -172,9 +172,7 @@ class MLH(Farmware):
 
         #calculating actual_watering today
         actual_watering=0
-        watering_days={}
-        if 'iwatering' in p['meta']:
-            watering_days=ast.literal_eval(p['meta']['iwatering'])
+        watering_days=self.get_watering_days(p)
         if today_ls in watering_days:
             actual_watering = watering_days[today_ls]
         else: watering_days[today_ls]=0
@@ -209,29 +207,16 @@ class MLH(Farmware):
 
 
     # ------------------------------------------------------------------------------------------------------------------
-    def to_str(self, p):
+    def finalize_log(self, p):
         str = '{:s}'.format(p['plant_stage'])
         if p['planted_at'] != None:
             str += '({:s})'.format(d2s(u2l(l2d(p['planted_at']))))
         str += ' {}'.format(p['meta'])
         return str
 
-    # ------------------------------------------------------------------------------------------------------------------
-    # returns True if iWatering shall be enabled
-    def is_iwatering(self):
-
-        iwatering = False
-        if self.args['after'] != None:
-            if all(x in self.args['after']['name'].lower() for x in ['mlh', 'water']):
-                if self.args['before']==None:
-                    self.log("iWatering mode is engaged", 'warn')
-                    iwatering = True
-
-        return iwatering
-
-    # ------------------------------------------------------------------------------------------------------------------
+       # ------------------------------------------------------------------------------------------------------------------
     # returns True if it is recommended to skip watering today
-    def skip_watering(self):
+    def check_rain(self):
 
         self.weather.load()
         self.log('Weather: \n{}'.format(self.weather))
@@ -256,11 +241,13 @@ class MLH(Farmware):
         return False
 
     # ------------------------------------------------------------------------------------------------------------------
-    def check_special_watering(self, name):
-        sq=None
-        try: sq = next(i for i in self.sequences() if all(x in i['name'].lower() for x in ['mlh','water',name.lower()]))
-        except: pass
-        return sq
+    def get_watering_days(self, plant):
+        watering_days = {}
+        if 'iwatering' not in plant['meta']:
+            plant['meta']['iwatering'] = {}
+        else:
+            watering_days = ast.literal_eval(plant['meta']['iwatering'])
+        return watering_days
 
     # ------------------------------------------------------------------------------------------------------------------
     def sort_plants(self, plants):
@@ -289,8 +276,14 @@ class MLH(Farmware):
             raise ValueError('Sequence not found: {}'.format(self.args[k].upper()))
 
         #check if we need to enable iWatering
-        iw=self.is_iwatering()
-        skip=self.skip_watering() if iw else False
+        iw = False
+        if self.args['after'] != None and self.args['before'] == None:
+            if all(x in self.args['after']['name'].lower() for x in ['mlh', 'water']):
+                self.log("iWatering mode is engaged", 'warn')
+                iw = True
+
+
+        skip=self.check_rain() if iw else False
         #skip=False
 
 
@@ -323,15 +316,16 @@ class MLH(Farmware):
         today_ls = d2s(today_local())
         travel_height = self.args['default_z']
         special=None
-        watering_days={}
 
         if iw and not skip:
-            special = self.check_special_watering(plants[0]['name'])
+            try:
+                special = next(i for i in self.sequences() if all(x in i['name'].lower() for x in ['mlh', 'water', plants[0]['name'].lower()]))
+            except:
+                special=None
+
             if special!=None:
                 skip = True
-                if 'iwatering' not in plants[0]['meta']: plants[0]['meta']['iwatering']={}
-                else: watering_days = ast.literal_eval(plants[0]['meta']['iwatering'])
-                if today_ls not in watering_days:
+                if today_ls not in self.get_watering_days(plants[0]):
                     self.log('All [{}] are handled by dedicated sequence {}'.format(plants[0]['name'], special['name']), 'warn')
                     self.execute_sequence(special)
 
@@ -339,30 +333,38 @@ class MLH(Farmware):
         # iterate over all eligible plants
         for plant in plants:
             need_update=False
-            message = 'Plant: ({:4d},{:4d}) {:15s} - {:s}'.format(plant['x'], plant['y'], plant['name'],self.to_str(plant))
+            message = 'Plant: ({:4d},{:4d}) {:15s} - {:s}'.format(plant['x'], plant['y'], plant['name'], self.finalize_log(plant))
 
             sq = self.args['after']
             if iw and not skip:
-                if self.iwatering(sq, plant):
+                if self.do_iwatering(sq, plant):
                     travel_height = self.get_travel_height(plant,self.args['default_z'])
                     need_update=True
 
             if not iw or need_update:
                 self.execute_sequence(self.args['before'], 'BEFORE: ')
                 if self.args['before']!=None or self.args['after']!=None:
-                        if not skip:
-                            self.move_absolute_safe({'x': plant['x'], 'y': plant['y'], 'z': travel_height})
+                        if not skip and special==None:
+                            location={'x': plant['x'], 'y': plant['y'], 'z': travel_height}
+                            if self.head['z'] < travel_height:
+                                self.move_absolute({'x': self.head['x'], 'y': self.head['y'], 'z': location['z']},message=None)
+                            else:
+                                self.move_absolute({'x': location['x'], 'y': location['y'], 'z': self.head['z']}, message=None)
+                            self.move_absolute(location=location, message=message)
 
                 if not skip: self.execute_sequence(sq, 'AFTER: ')
 
             if special!=None:
-                watering_days[today_ls]=1
-                plant['meta']['iwatering'] = str(watering_days)
-                need_update = True
-            if self.update_meta(plant): need_update=True
+                watering_days=self.get_watering_days(plant)
+                if today_ls not in watering_days:
+                    watering_days[today_ls]=1
+                    plant['meta']['iwatering'] = str(watering_days)
+                    need_update = True
+            if self.update_meta(plant):
+                need_update=True
 
             if need_update:
-                message += ' -> {}'.format(self.to_str(plant))
+                message += ' -> {}'.format(self.finalize_log(plant))
                 self.put("points/{}".format(plant['id']), plant)
 
             self.log(message)
