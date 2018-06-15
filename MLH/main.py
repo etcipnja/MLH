@@ -344,7 +344,7 @@ class MLH(Farmware):
             if not iw or need_update:
                 self.execute_sequence(self.args['before'], 'BEFORE: ')
                 if self.args['before']!=None or self.args['after']!=None:
-                        if not skip and special==None:
+                        if not skip:
                             location={'x': plant['x'], 'y': plant['y'], 'z': travel_height}
                             if self.head['z'] < travel_height:
                                 self.move_absolute({'x': self.head['x'], 'y': self.head['y'], 'z': location['z']},message=None)
