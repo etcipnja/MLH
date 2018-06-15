@@ -368,7 +368,7 @@ class MLH(Farmware):
                 self.put("points/{}".format(plant['id']), plant)
 
             self.log(message)
-            self.head = {'x': plant['x'], 'y': plant['y'], 'z': travel_height}
+           
 
 
 # ----------------------------------------------------------------------------------------------------------------------
