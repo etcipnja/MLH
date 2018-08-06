@@ -87,16 +87,24 @@ class Farmware(object):
         self.weather=Weather(self)
 
         try:
-            self.api_token=os.environ['API_TOKEN']
-            self.farmware_url=os.environ['FARMWARE_URL']
+            self.api_token = os.environ.get('API_TOKEN','')
+            if self.api_token=='':  #this is local execution situation
+                with open('../../Farmbot.lib/API_KEY.txt', 'r') as myfile:
+                    self.api_token = myfile.read().replace('\n', '')
+
+            self.farmware_url = os.environ.get('FARMWARE_URL','')
+            if self.farmware_url == '':
+                with open('../../Farmbot.lib/FARMWARE_URL.txt', 'r') as myfile:
+                    self.farmware_url = myfile.read().replace('\n', '')
+
             self.headers = {'Authorization': 'Bearer ' + self.api_token, 'content-type': "application/json"}
             encoded_payload = self.api_token.split('.')[1]
             encoded_payload += '=' * (4 - len(encoded_payload) % 4)
             token = json.loads(base64.b64decode(encoded_payload).decode('utf-8'))
             self.bot_id=token['bot']
             self.api_url = 'https:'+token['iss']+'/api/'
-            #self.api_url='https://my.farmbot.io/api/'
-            self.mqtt_url=token['mqtt']
+            # self.api_url='https://my.farmbot.io/api/'
+            self.mqtt_url = token['mqtt']
         except :
             print("API_TOKEN or FARMWARE_URL is not set, you gonna have a bad time")
             sys.exit(1)
@@ -116,6 +124,7 @@ class Farmware(object):
         device = self.get('device')
         self.head = self.state()['location_data']['position']
         tz = device['tz_offset_hrs']
+
 
     # ------------------------------------------------------------------------------------------------------------------
     # loads config parameters
@@ -161,13 +170,14 @@ class Farmware(object):
             time.sleep(10)
 
         for i in range(1,2):
+            self.log("...actually syncing...")
             node = {'kind': 'sync', 'args': {}}
             response = requests.post(self.farmware_url + 'api/v1/celery_script', data=json.dumps(node),headers=self.headers)
             response.raise_for_status()
 
             for cnt in range(1,30):
                 sync=self.state()['informational_settings']['sync_status']
-                self.log("Sync status {}".format(sync))
+                self.log("interim status {}".format(sync))
                 if sync== "synced" or sync == "sync failed": break
                 time.sleep(1)
             if cnt>=30: raise ValueError('Sync error, bot failed to complete syncing')

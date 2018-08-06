@@ -25,14 +25,14 @@ class MLH(Farmware):
 
 
         super(MLH,self).load_config()
-        self.get_arg('action'       , "local", str)
-        self.get_arg('pointname'    , "*", str)
+        self.get_arg('action'       , "real", str)
+        self.get_arg('pointname'    , '*', str)
         self.get_arg('default_z'    , -380, int)
         self.get_arg('filter_meta'  , None, list)
-        self.get_arg('save_meta'    , None,list)
+        self.get_arg('save_meta'    , [('iwatering','2018-08-06')],list)
         self.get_arg('init'         , None, str)
         self.get_arg('before'       , None, str)
-        self.get_arg('after'        , 'Water [MLH]', str)
+        self.get_arg('after'        , None, str)
         self.get_arg('end'          , None, str)
 
         self.args['pointname']=self.args['pointname'].lower().split(',')
@@ -114,6 +114,11 @@ class MLH(Farmware):
                             if d2s(u2l(l2d(p['planted_at'])))==val: skip=True
                         if not skip:
                             p[key] = d2l(l2u(s2d(val)))
+                            need_update = True
+                    elif key == 'iwatering':
+                        iwatering=ast.literal_eval(p['meta']['iwatering'])
+                        if iwatering.pop(val, None):
+                            p['meta']['iwatering'] = str(iwatering)
                             need_update = True
                     elif not (key in p['meta'] and p['meta'][key] == val):
                             p['meta'][key] = val
@@ -208,11 +213,16 @@ class MLH(Farmware):
 
     # ------------------------------------------------------------------------------------------------------------------
     def finalize_log(self, p):
-        str = '{:s}'.format(p['plant_stage'])
+        out = '{:s}'.format(p['plant_stage'])
         if p['planted_at'] != None:
-            str += '({:s})'.format(d2s(u2l(l2d(p['planted_at']))))
-        str += ' {}'.format(p['meta'])
-        return str
+            out += '({:s})'.format(d2s(u2l(l2d(p['planted_at']))))
+        iwatering = ast.literal_eval(p['meta']['iwatering']).items()
+        iwatering = sorted(iwatering, key=lambda elem: (s2d(elem[0])))[-3:]
+        p['meta']['iwatering'] = {key: value for (key, value) in iwatering}
+        p['meta']['iwatering'] = str(p['meta']['iwatering'])
+        out += ' {}'.format(p['meta'])
+
+        return out
 
        # ------------------------------------------------------------------------------------------------------------------
     # returns True if it is recommended to skip watering today
@@ -350,7 +360,7 @@ class MLH(Farmware):
                                 self.move_absolute({'x': self.head['x'], 'y': self.head['y'], 'z': location['z']},message=None)
                             else:
                                 self.move_absolute({'x': location['x'], 'y': location['y'], 'z': self.head['z']}, message=None)
-                            self.move_absolute(location=location, message=message)
+                            self.move_absolute(location=location)
 
                 if not skip: self.execute_sequence(sq, 'AFTER: ')
 

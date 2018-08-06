@@ -165,6 +165,11 @@ If you want to provide custom sequence for watering of your particular plant nam
 built-in watering will be performed. For example if farmware finds "Water [MLH] - Carrot" - this sequence will be called
 when all carrots have to be watered and "Water [MLH]" will NOT be called.
 
+To delete information about intelligent watering in particular day 
+``` 
+SAVE IN META DATA    [('iwatering','2018-08-06')] #YYYY-MM-DD
+```
+
 # Installation:
 
 Use this manifest to register farmware
