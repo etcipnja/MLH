@@ -94,8 +94,8 @@ class Farmware(object):
             encoded_payload += '=' * (4 - len(encoded_payload) % 4)
             token = json.loads(base64.b64decode(encoded_payload).decode('utf-8'))
             self.bot_id=token['bot']
-            #self.api_url = 'https:'+token['iss']+'/api/'
-            self.api_url='https://my.farmbot.io/api/'
+            self.api_url = 'https:'+token['iss']+'/api/'
+            #self.api_url='https://my.farmbot.io/api/'
             self.mqtt_url=token['mqtt']
         except :
             print("API_TOKEN or FARMWARE_URL is not set, you gonna have a bad time")
@@ -172,6 +172,8 @@ class Farmware(object):
                 time.sleep(1)
             if cnt>=30: raise ValueError('Sync error, bot failed to complete syncing')
             if sync != "sync failed": break
+
+        self.log('Sync status {}'.format(self.state()['informational_settings']['sync_status']))
 
     # ------------------------------------------------------------------------------------------------------------------
     def state(self):
