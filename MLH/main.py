@@ -25,11 +25,11 @@ class MLH(Farmware):
 
 
         super(MLH,self).load_config()
-        self.get_arg('action'       , "real", str)
-        self.get_arg('pointname'    , '*', str)
+        self.get_arg('action'       , "test", str)
+        self.get_arg('pointname'    , 'Pepper', str)
         self.get_arg('default_z'    , -380, int)
         self.get_arg('filter_meta'  , None, list)
-        self.get_arg('save_meta'    , [('iwatering','2018-08-06')],list)
+        self.get_arg('save_meta'    , None,list)
         self.get_arg('init'         , None, str)
         self.get_arg('before'       , None, str)
         self.get_arg('after'        , None, str)
@@ -216,10 +216,11 @@ class MLH(Farmware):
         out = '{:s}'.format(p['plant_stage'])
         if p['planted_at'] != None:
             out += '({:s})'.format(d2s(u2l(l2d(p['planted_at']))))
-        iwatering = ast.literal_eval(p['meta']['iwatering']).items()
-        iwatering = sorted(iwatering, key=lambda elem: (s2d(elem[0])))[-3:]
-        p['meta']['iwatering'] = {key: value for (key, value) in iwatering}
-        p['meta']['iwatering'] = str(p['meta']['iwatering'])
+        if 'iwatering' in p['meta']:
+            iwatering = ast.literal_eval(p['meta']['iwatering']).items()
+            iwatering = sorted(iwatering, key=lambda elem: (s2d(elem[0])))[-3:]
+            p['meta']['iwatering'] = {key: value for (key, value) in iwatering}
+            p['meta']['iwatering'] = str(p['meta']['iwatering'])
         out += ' {}'.format(p['meta'])
 
         return out
