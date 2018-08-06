@@ -168,10 +168,10 @@ class Farmware(object):
             for cnt in range(1,30):
                 sync=self.state()['informational_settings']['sync_status']
                 self.log("Sync status {}".format(sync))
-                if sync== "synced" or sync == "sync failed": break
+                if sync== "synced" or sync == "sync_error": break
                 time.sleep(1)
             if cnt>=30: raise ValueError('Sync error, bot failed to complete syncing')
-            if sync != "sync failed": break
+            if sync != "sync_error": break
 
         self.log('Sync status {}'.format(self.state()['informational_settings']['sync_status']))
 
