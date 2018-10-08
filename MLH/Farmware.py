@@ -92,7 +92,7 @@ class Farmware(object):
                 with open('../../Farmbot.lib/API_KEY.txt', 'r') as myfile:
                     self.api_token = myfile.read().replace('\n', '')
 
-            self.farmware_url = os.environ.get('FARMWARE_URL','')
+        self.farmware_url = os.environ.get('FARMWARE_URL','')
             if self.farmware_url == '':
                 with open('../../Farmbot.lib/FARMWARE_URL.txt', 'r') as myfile:
                     self.farmware_url = myfile.read().replace('\n', '')
@@ -169,12 +169,14 @@ class Farmware(object):
         if not self.debug:
             time.sleep(10)
 
+        sync = ""
         for i in range(1,2):
             self.log("...actually syncing...")
             node = {'kind': 'sync', 'args': {}}
             response = requests.post(self.farmware_url + 'api/v1/celery_script', data=json.dumps(node),headers=self.headers)
             response.raise_for_status()
 
+            cnt = 0
             for cnt in range(1,30):
                 sync=self.state()['informational_settings']['sync_status']
                 self.log("interim status {}".format(sync))
