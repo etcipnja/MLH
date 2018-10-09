@@ -92,7 +92,7 @@ class Farmware(object):
                 with open('../../Farmbot.lib/API_KEY.txt', 'r') as myfile:
                     self.api_token = myfile.read().replace('\n', '')
 
-        self.farmware_url = os.environ.get('FARMWARE_URL','')
+            self.farmware_url = os.environ.get('FARMWARE_URL','')
             if self.farmware_url == '':
                 with open('../../Farmbot.lib/FARMWARE_URL.txt', 'r') as myfile:
                     self.farmware_url = myfile.read().replace('\n', '')
