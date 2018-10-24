@@ -310,13 +310,17 @@ class MLH(Farmware):
 
         processed=[]
 
-        while True:
-            distances=[(self.distance(x, self.head), x) for x in plants if x['name'] not in processed]
-            if len(distances) == 0: break  # all done
-            d,p=min(distances)
-            to_process=self.sort_plants([x for x in plants if x['name'] == p['name']])
+        if iw:
+            while True:
+                distances=[(self.distance(x, self.head), x) for x in plants if x['name'] not in processed]
+                if len(distances) == 0: break  # all done
+                d,p=min(distances)
+                to_process=self.sort_plants([x for x in plants if x['name'] == p['name']])
+                self.process_plants(to_process, iw, skip)
+                processed.append(p['name'])
+        else:
+            to_process = self.sort_plants(plants)
             self.process_plants(to_process, iw, skip)
-            processed.append(p['name'])
 
         # execute end sequence
         self.execute_sequence(self.args['end'], "END: ")
